@@ -21,58 +21,62 @@ AI-powered land record intelligence for accountable digital public service. Bhoo
 BhoomiSetu AI/
 ├── app/
 │   ├── auth/
-│   │   └── page.tsx          # Unified auth page (login + register) with role selector
+│   │   └── page.tsx               # Unified auth page (login + register) with role selector
 │   ├── dashboard/
 │   │   ├── citizen/
-│   │   │   └── page.tsx      # Citizen / Public Landowner portal
+│   │   │   └── page.tsx           # Citizen / Public Landowner portal
 │   │   ├── operator/
-│   │   │   └── page.tsx      # Data Operator / Document Ingestion portal
+│   │   │   └── page.tsx           # Data Operator / Document Ingestion portal
 │   │   ├── verifier/
-│   │   │   └── page.tsx      # Cadastral Surveyor / Verifier portal
+│   │   │   └── page.tsx           # Cadastral Surveyor / Verifier portal
 │   │   ├── officer/
-│   │   │   └── page.tsx      # Revenue Officer / Tehsildar adjudication portal
+│   │   │   └── page.tsx           # Revenue Officer / Tehsildar adjudication portal
 │   │   ├── auditor/
-│   │   │   └── page.tsx      # Vigilance & Audit Inspector portal (read-only)
+│   │   │   └── page.tsx           # Vigilance & Audit Inspector portal (read-only)
 │   │   └── admin/
-│   │       └── page.tsx      # System Administrator portal
+│   │       └── page.tsx           # System Administrator portal
 │   ├── login/
-│   │   └── page.tsx          # Alias → auth page (login tab)
+│   │   └── page.tsx               # Alias → auth page (login tab)
 │   ├── register/
-│   │   └── page.tsx          # Alias → auth page (register tab)
-│   ├── globals.css            # Global styles, design tokens, dashboard & animation CSS
-│   ├── layout.tsx             # Root layout with theme init script
-│   └── page.tsx               # Landing / home page
+│   │   └── page.tsx               # Alias → auth page (register tab)
+│   ├── globals.css                # Global styles, design tokens, dashboard & animation CSS
+│   ├── layout.tsx                 # Root layout with theme init script
+│   └── page.tsx                   # Landing / home page
 │
 ├── components/
 │   ├── ui/
-│   │   └── button.tsx         # shadcn button primitive
-│   ├── auth-sliding.tsx       # (legacy, unused)
-│   ├── cadastral-gis.tsx      # Interactive PostGIS cadastral map section
-│   ├── dashboard-shell.tsx    # Shared sidebar + topbar layout for all role dashboards
-│   ├── dashboard-view.tsx     # Monitoring telemetry section (home page)
-│   ├── parcel-lifecycle.tsx   # 12-step pipeline walkthrough section
-│   ├── validation-engine.tsx  # Validation & anomaly intelligence section
-│   └── verification-studio.tsx # Split-screen verification studio section
+│   │   └── button.tsx             # shadcn button primitive
+│   ├── auth-sliding.tsx           # (legacy, unused)
+│   ├── brand-icon.tsx             # BhoomiSetu brand icon component
+│   ├── cadastral-gis.tsx          # Interactive PostGIS cadastral map section
+│   ├── dashboard-shell.tsx        # Shared sidebar + topbar layout for all role dashboards
+│   ├── dashboard-view.tsx         # Monitoring telemetry section (home page)
+│   ├── parcel-lifecycle.tsx       # 12-step pipeline walkthrough section
+│   ├── validation-engine.tsx      # Validation & anomaly intelligence section
+│   └── verification-studio.tsx    # Split-screen verification studio section
 │
 ├── lib/
-│   ├── use-scroll-reveal.ts   # IntersectionObserver hook for scroll animations
-│   └── utils.ts               # clsx/tailwind-merge utility
+│   ├── use-scroll-reveal.ts       # IntersectionObserver hook for scroll animations
+│   ├── use-theme.ts               # Theme toggle hook (dark/light)
+│   └── utils.ts                   # clsx/tailwind-merge utility
 │
 ├── public/
-│   ├── auth-landscape.png     # (unused)
-│   ├── bhoomisetu bg video.mp4 # Hero background video
-│   ├── bhoomisetu-fields.png  # Background image (auth + dashboard pages)
-│   └── icon.svg               # Favicon
+│   ├── auth-landscape.png         # (unused)
+│   ├── bhoomisetu bg video.mp4    # Hero background video
+│   ├── bhoomisetu-fields.png      # Background image (auth + dashboard pages)
+│   └── icon.svg                   # Favicon
 │
 ├── .gitignore
-├── components.json            # shadcn config
+├── components.json                # shadcn config
 ├── next.config.mjs
+├── next-env.d.ts                  # Auto-generated Next.js types
 ├── package.json
 ├── pnpm-lock.yaml
 ├── pnpm-workspace.yaml
 ├── postcss.config.mjs
 ├── README.md
-└── tsconfig.json
+├── tsconfig.json
+└── vercel.json                    # Vercel deployment config
 ```
 
 ---
