@@ -1,0 +1,27 @@
+export default function BrandIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 32 32"
+      fill="none"
+      width={size}
+      height={size}
+      style={{ flexShrink: 0 }}
+    >
+      <rect width="32" height="32" rx="8" fill="#047857" />
+      <path
+        d="M16 26C16 26 12 21 12 16C12 12.6863 14.6863 10 18 10C21.3137 10 24 12.6863 24 16C24 21 20 26 20 26"
+        stroke="#A7F3D0"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path d="M16 26V15" stroke="#ECFDF5" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M8 24C10.5 22 13.5 22 16 24C18.5 26 21.5 26 24 24"
+        stroke="#FDE68A"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
