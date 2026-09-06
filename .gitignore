@@ -1,27 +1,50 @@
-# Environment variables
-.env*.local
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
 .env
+.env.local
+.env*.local
+backend/.env
 
-# Next.js
-.next/
-out/
+# =============================================================================
+# FRONTEND (Next.js)
+# =============================================================================
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+frontend/.pnpm-store/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/.vercel
+frontend/storage/
 
-# Dependencies
-node_modules/
-.pnpm-store/
+# =============================================================================
+# BACKEND (Python / FastAPI)
+# =============================================================================
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.pytest_cache/
+backend/**/.pytest_cache/
+backend/storage/
+backend/alembic/versions/*.pyc
 
-# Build artifacts
-*.tsbuildinfo
-next-env.d.ts
-
-# OS
+# =============================================================================
+# OS & EDITOR
+# =============================================================================
 .DS_Store
 Thumbs.db
-
-# Vercel
-.vercel
-
-# Logs
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# =============================================================================
+# MISC
+# =============================================================================
+*.tsbuildinfo

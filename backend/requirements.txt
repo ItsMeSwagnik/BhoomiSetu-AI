@@ -1,0 +1,30 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]>=3.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+firebase-admin==6.6.0
+python-multipart==0.0.20
+python-jose[cryptography]==3.3.0
+celery==5.4.0
+redis==5.2.1
+pillow>=11.1.0
+pymupdf==1.25.1
+opencv-python-headless==4.10.0.84
+rapidfuzz>=3.11.0
+shapely==2.0.6
+geoalchemy2==0.17.0
+geopandas>=0.14.0
+pytesseract>=0.3.13
+python-dotenv==1.0.1
+httpx==0.28.1
+pytest==8.3.4
+pytest-asyncio==0.24.0
+# NLP / NER: install separately to avoid heavy download on first run
+# pip install spacy && python -m spacy download en_core_web_sm
+# spacy>=3.7.0
+# Optional heavy OCR engines (install separately):
+# pip install "paddleocr[doc-parser]>=3.6.0"
+# pip install transformers torch
