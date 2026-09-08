@@ -46,7 +46,7 @@ import {
   X,
 } from 'lucide-react'
 import { api, LAND_CLASSIFICATION_OPTIONS } from '@/lib/api'
-import { uploadToPuter } from '@/lib/puter-storage'
+import { uploadToStorageTo } from '@/lib/storage-to'
 import type { DocumentItem, LandRecord, LandClassificationOption } from '@/lib/api-types'
 
 interface ProcessingStage {
@@ -103,7 +103,7 @@ export default function OperatorDashboard() {
   const [districtFilter, setDistrictFilter] = useState('All')
 
   const stages: ProcessingStage[] = [
-    { id: 1, title: 'Document Ingestion', desc: 'Uploading PDF to Firestore & secure storage', status: currentStageIdx > 0 ? 'completed' : currentStageIdx === 0 ? 'active' : 'pending' },
+    { id: 1, title: 'Document Ingestion', desc: 'Uploading PDF to Storage.to Cloud Storage (No login required)', status: currentStageIdx > 0 ? 'completed' : currentStageIdx === 0 ? 'active' : 'pending' },
     { id: 2, title: 'Document Rasterization', desc: 'Rendering PDF pages to 150 DPI vision matrices via PyMuPDF', status: currentStageIdx > 1 ? 'completed' : currentStageIdx === 1 ? 'active' : 'pending' },
     { id: 3, title: 'Native Groq VLM Reasoning', desc: 'Multi-page vision inspection via Qwen 3.8/3.6 Vision VLM', status: currentStageIdx > 2 ? 'completed' : currentStageIdx === 2 ? 'active' : 'pending' },
     { id: 4, title: 'Entity & Land Type Extraction', desc: 'Extracting 20 land revenue fields & classifying terrain', status: currentStageIdx > 3 ? 'completed' : currentStageIdx === 3 ? 'active' : 'pending' },
@@ -164,20 +164,20 @@ export default function OperatorDashboard() {
     }
 
     try {
-      advanceStage(0) // Stage 1: Puter.com Cloud Storage Ingestion
-      let puterCloudUrl: string | null = null
+      advanceStage(0) // Stage 1: Storage.to Cloud Storage Ingestion
+      let storageToUrl: string | null = null
       try {
-        const puterResult = await uploadToPuter(file)
-        puterCloudUrl = puterResult.cloudUrl
-      } catch (pErr) {
-        console.warn('Puter upload fallback:', pErr)
+        const storageToResult = await uploadToStorageTo(file)
+        storageToUrl = storageToResult.cloudUrl
+      } catch (sErr) {
+        console.warn('Storage.to upload fallback:', sErr)
       }
       
       advanceStage(1) // Stage 2: Document Rasterization
       await new Promise(r => setTimeout(r, 400))
 
       advanceStage(2) // Stage 3: Vision Extraction Pipeline
-      const uploadPromise = api.documents.upload(file, puterCloudUrl || undefined)
+      const uploadPromise = api.documents.upload(file, storageToUrl || undefined)
       
       const timer = setTimeout(() => advanceStage(3), 1200)
 
