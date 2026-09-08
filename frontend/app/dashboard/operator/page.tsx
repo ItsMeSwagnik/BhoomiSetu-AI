@@ -103,7 +103,7 @@ export default function OperatorDashboard() {
   const [districtFilter, setDistrictFilter] = useState('All')
 
   const stages: ProcessingStage[] = [
-    { id: 1, title: 'Document Ingestion', desc: 'Uploading PDF to Storage.to Cloud Storage (No login required)', status: currentStageIdx > 0 ? 'completed' : currentStageIdx === 0 ? 'active' : 'pending' },
+    { id: 1, title: 'Document Ingestion', desc: 'Uploading PDF to Cloudinary Secure Storage CDN', status: currentStageIdx > 0 ? 'completed' : currentStageIdx === 0 ? 'active' : 'pending' },
     { id: 2, title: 'Document Rasterization', desc: 'Rendering PDF pages to 150 DPI vision matrices via PyMuPDF', status: currentStageIdx > 1 ? 'completed' : currentStageIdx === 1 ? 'active' : 'pending' },
     { id: 3, title: 'Native Groq VLM Reasoning', desc: 'Multi-page vision inspection via Qwen 3.8/3.6 Vision VLM', status: currentStageIdx > 2 ? 'completed' : currentStageIdx === 2 ? 'active' : 'pending' },
     { id: 4, title: 'Entity & Land Type Extraction', desc: 'Extracting 20 land revenue fields & classifying terrain', status: currentStageIdx > 3 ? 'completed' : currentStageIdx === 3 ? 'active' : 'pending' },
@@ -164,13 +164,13 @@ export default function OperatorDashboard() {
     }
 
     try {
-      advanceStage(0) // Stage 1: Storage.to Cloud Storage Ingestion
+      advanceStage(0) // Stage 1: Cloud Storage Ingestion
       let storageToUrl: string | null = null
       try {
         const storageToResult = await uploadToStorageTo(file)
         storageToUrl = storageToResult.cloudUrl
       } catch (sErr) {
-        console.warn('Storage.to upload fallback:', sErr)
+        console.warn('Direct cloud upload fallback:', sErr)
       }
       
       advanceStage(1) // Stage 2: Document Rasterization

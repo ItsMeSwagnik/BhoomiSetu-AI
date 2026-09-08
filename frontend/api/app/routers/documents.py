@@ -163,13 +163,13 @@ def get_document_file(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not os.path.exists(doc.file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id, doc.file_url)
+    if not file_bytes:
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Cloudinary")
 
-    return FileResponse(
-        doc.file_path,
+    return Response(
+        content=file_bytes,
         media_type=doc.mime_type or "application/pdf",
-        content_disposition_type="inline",
         headers={"Content-Disposition": f'inline; filename="{doc.original_filename}"'}
     )
 
@@ -178,15 +178,19 @@ def get_document_file(doc_id: str, db: Session = Depends(get_db)):
 def get_document_pages(doc_id: str, db: Session = Depends(get_db)):
     """Renders all PDF pages as base64 images for interactive in-browser document viewer."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc or not os.path.exists(doc.file_path):
-        raise HTTPException(status_code=404, detail="Document file not found")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document record not found")
+
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id, doc.file_url)
+    if not file_bytes:
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Cloudinary")
 
     import fitz
     import base64
 
     pages = []
     try:
-        pdf_doc = fitz.open(doc.file_path)
+        pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
         for page in pdf_doc:
             pix = page.get_pixmap(dpi=150)
             b64 = base64.b64encode(pix.tobytes("png")).decode("utf-8")

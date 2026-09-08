@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.85
     gis_area_tolerance_percent: float = 10.0
     groq_api_key: Optional[str] = None
+    cloudinary_url: Optional[str] = "cloudinary://782446436321221:q5G_FUBhrYVEcdJADvEf2UBJpLI@dgz0zrojz"
+    cloudinary_cloud_name: Optional[str] = "dgz0zrojz"
+    cloudinary_api_key: Optional[str] = "782446436321221"
+    cloudinary_api_secret: Optional[str] = "q5G_FUBhrYVEcdJADvEf2UBJpLI"
 
     class Config:
         env_file = ".env"

@@ -169,9 +169,9 @@ def get_document_file(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id)
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id, doc.file_url)
     if not file_bytes:
-        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Firebase")
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Cloudinary")
 
     return Response(
         content=file_bytes,
@@ -187,9 +187,9 @@ def get_document_pages(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document record not found")
 
-    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id)
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id, doc.file_url)
     if not file_bytes:
-        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Firebase")
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Cloudinary")
 
     import fitz
     import base64

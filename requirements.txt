@@ -10,3 +10,4 @@ pymupdf>=1.25.0
 rapidfuzz>=3.10.0
 python-dotenv>=1.0.1
 httpx>=0.28.0
+cloudinary>=1.41.0

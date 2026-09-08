@@ -27,22 +27,23 @@ except Exception as e:
     print(f"  ✗ Test 1 Failed: {e}")
     sys.exit(1)
 
-# 2. Storage & Firebase Verification
-print("\n[TEST 2/5] Checking Storage Engine & Firebase Services...")
+# 2. Storage & Cloudinary Verification
+print("\n[TEST 2/5] Checking Storage Engine & Cloudinary Services...")
 try:
     from app.services.storage import storage_service
     status = storage_service.test_status()
     print(f"  ✓ Local Storage Path: {status['local_storage']['path']}")
     print(f"  ✓ Storage Directory Writable: {status['local_storage']['writable']}")
-    print(f"  ✓ Firebase Project ID: {status['firebase']['project_id']}")
-    print(f"  ✓ Storage Mode: {status['firebase']['mode']} (Firestore/Cloud Storage fallback active)")
+    print(f"  ✓ Cloudinary Cloud Name: {status['cloudinary']['cloud_name']}")
+    print(f"  ✓ Cloudinary Ready: {status['cloudinary']['ready']}")
+    print(f"  ✓ Storage Mode: {status['cloudinary']['mode']}")
     
     # Test sample file write and read
     test_bytes = b"%PDF-1.4 test document binary content"
     fid, lpath, furl = storage_service.save_file(test_bytes, "test_check.pdf")
-    read_back = storage_service.get_file_bytes(lpath)
+    read_back = storage_service.get_file_bytes(lpath, fid, furl)
     assert read_back == test_bytes, "File readback did not match written bytes"
-    print(f"  ✓ Storage Save & Retrieve: Verified (file ID: {fid[:8]}...)")
+    print(f"  ✓ Storage Save & Retrieve: Verified (file ID: {fid[:8]}..., url: {furl[:40]}...)")
 except Exception as e:
     print(f"  ✗ Test 2 Failed: {e}")
     sys.exit(1)
