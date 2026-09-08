@@ -130,10 +130,14 @@ def validate_record_against_pdf(record_id: str, db: Session = Depends(get_db)):
     from app.services.validation import validation_service
     from app.services.storage import storage_service, STORAGE_DIR
 
-    file_bytes = storage_service.get_file_bytes(record.document.file_path, record.document.id)
+    file_bytes = storage_service.get_file_bytes(
+        record.document.file_path,
+        record.document.id,
+        record.document.file_url
+    )
 
     if not file_bytes:
-        raise HTTPException(status_code=404, detail="Source PDF document could not be retrieved from storage/Firebase")
+        raise HTTPException(status_code=404, detail="Source PDF document could not be retrieved from storage or Cloudinary")
 
     # Construct extraction dict to validate
     extracted_data = {

@@ -60,6 +60,7 @@ def record_to_dict(r: LandRecord) -> Dict[str, Any]:
         "newOwner": r.new_owner,
         "confidenceScore": r.confidence_score,
         "ocrModelUsed": r.ocr_model_used,
+        "isValidated": bool(r.is_validated),
         "rawOcrResponse": r.raw_ocr_response,
         "status": r.status,
         "document": {
@@ -78,6 +79,7 @@ def list_records(
     q: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    is_validated: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
     query = db.query(LandRecord).order_by(LandRecord.created_at.desc())
@@ -85,6 +87,8 @@ def list_records(
         query = query.filter(LandRecord.district.ilike(f"%{district}%"))
     if status:
         query = query.filter(LandRecord.status == status)
+    if is_validated is not None:
+        query = query.filter(LandRecord.is_validated == is_validated)
     if q:
         query = query.filter(
             (LandRecord.owner.ilike(f"%{q}%")) |
@@ -103,6 +107,89 @@ def get_record(record_id: str, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="Land record not found")
     return record_to_dict(record)
+
+
+@router.post("/{record_id}/validate")
+def validate_record_against_pdf(record_id: str, db: Session = Depends(get_db)):
+    """
+    Fetches the source document/PDF (from Cloudinary or local storage), runs the
+    ground-truth validation engine against LLM extraction, updates the `is_validated`
+    database column to True (if passed) or False (if failed), and stores the full scorecard.
+    """
+    record = db.query(LandRecord).filter(LandRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Land record not found")
+
+    if not record.document:
+        raise HTTPException(status_code=400, detail="Record does not have an associated document")
+
+    from app.services.validation import validation_service
+    from app.services.storage import storage_service
+
+    file_bytes = storage_service.get_file_bytes(
+        record.document.file_path,
+        record.document.id,
+        record.document.file_url
+    )
+
+    if not file_bytes:
+        raise HTTPException(status_code=404, detail="Source PDF document could not be retrieved from storage or Cloudinary")
+
+    # Construct extraction dict to validate
+    extracted_data = {
+        "owner": record.owner,
+        "co_owner": record.co_owner,
+        "share": record.share,
+        "khatian_khata": record.khatian_khata,
+        "khasra": record.khasra,
+        "dag": record.dag,
+        "plot_number": record.plot_number,
+        "survey_number": record.survey_number,
+        "area": record.area,
+        "area_unit": record.area_unit,
+        "village": record.village,
+        "mouza": record.mouza,
+        "tehsil_taluk": record.tehsil_taluk,
+        "district": record.district,
+        "land_classification": record.land_classification or ["Agricultural Land"],
+        "mutation_number": record.mutation_number,
+        "mutation_date": record.mutation_date,
+        "registration_number": record.registration_number,
+        "registration_date": record.registration_date,
+        "previous_owner": record.previous_owner,
+        "new_owner": record.new_owner,
+        "confidence_score": record.confidence_score or 0.95,
+    }
+
+    # Run PDF Ground Truth Cross-Validation
+    scorecard = validation_service.validate_against_pdf(
+        extracted_data,
+        file_bytes,
+        record.document.original_filename
+    )
+
+    # Pass condition: fidelity >= 70% and no hard discrepancy flags
+    fidelity = scorecard.get("overallFidelityScore", 0)
+    has_discrepancies = len(scorecard.get("discrepancies", [])) > 0
+    passed = (fidelity >= 70.0) and (not has_discrepancies)
+
+    record.is_validated = passed
+    raw_ocr = dict(record.raw_ocr_response or {})
+    raw_ocr["validation_scorecard"] = scorecard
+    record.raw_ocr_response = raw_ocr
+    record.confidence_score = round(fidelity / 100.0, 2)
+
+    db.commit()
+    db.refresh(record)
+
+    return {
+        "success": True,
+        "isValidated": record.is_validated,
+        "fidelityScore": fidelity,
+        "fidelityGrade": scorecard.get("fidelityGrade"),
+        "discrepancies": scorecard.get("discrepancies", []),
+        "record": record_to_dict(record),
+    }
 
 
 @router.put("/{record_id}")

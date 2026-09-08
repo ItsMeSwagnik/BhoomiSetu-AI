@@ -46,7 +46,6 @@ import {
   X,
 } from 'lucide-react'
 import { api, LAND_CLASSIFICATION_OPTIONS } from '@/lib/api'
-import { uploadToStorageTo } from '@/lib/storage-to'
 import type { DocumentItem, LandRecord, LandClassificationOption } from '@/lib/api-types'
 
 interface ProcessingStage {
@@ -165,19 +164,13 @@ export default function OperatorDashboard() {
 
     try {
       advanceStage(0) // Stage 1: Cloud Storage Ingestion
-      let storageToUrl: string | null = null
-      try {
-        const storageToResult = await uploadToStorageTo(file)
-        storageToUrl = storageToResult.cloudUrl
-      } catch (sErr) {
-        console.warn('Direct cloud upload fallback:', sErr)
-      }
+      await new Promise(r => setTimeout(r, 200))
       
       advanceStage(1) // Stage 2: Document Rasterization
       await new Promise(r => setTimeout(r, 400))
 
       advanceStage(2) // Stage 3: Vision Extraction Pipeline
-      const uploadPromise = api.documents.upload(file, storageToUrl || undefined)
+      const uploadPromise = api.documents.upload(file)
       
       const timer = setTimeout(() => advanceStage(3), 1200)
 
