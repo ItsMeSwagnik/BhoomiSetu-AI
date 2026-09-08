@@ -184,8 +184,9 @@ export default function OperatorDashboard() {
 
       if (result?.record) {
         setActiveRecord(result.record)
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
         const docUrl = result.document?.fileUrl 
-          ? (result.document.fileUrl.startsWith('http') ? result.document.fileUrl : `http://localhost:8000${result.document.fileUrl}`)
+          ? (result.document.fileUrl.startsWith('http') || result.document.fileUrl.startsWith('blob:') ? result.document.fileUrl : `${apiBase}${result.document.fileUrl}`)
           : URL.createObjectURL(file)
         setActiveDocUrl(docUrl)
       }
@@ -202,11 +203,11 @@ export default function OperatorDashboard() {
   const openRecordInspector = async (rec: LandRecord) => {
     setActiveRecord({ ...rec })
     setSaveSuccess(false)
-    const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
     const docUrl = rec.documentId 
-      ? `${backendBase}/api/documents/${rec.documentId}/file` 
+      ? `${apiBase}/api/documents/${rec.documentId}/file` 
       : rec.document?.fileUrl 
-        ? `${backendBase}${rec.document.fileUrl}` 
+        ? `${apiBase}${rec.document.fileUrl}` 
         : null
     setActiveDocUrl(docUrl)
   }
@@ -633,7 +634,7 @@ export default function OperatorDashboard() {
                   </span>
                   {doc.fileUrl && (
                     <a
-                      href={`http://localhost:8000${doc.fileUrl}`}
+                      href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}${doc.fileUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="dash-outline-btn py-1 px-2 text-xs inline-flex items-center gap-1"

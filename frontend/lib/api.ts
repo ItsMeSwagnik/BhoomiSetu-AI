@@ -11,8 +11,8 @@ export type {
 }
 export { LAND_CLASSIFICATION_OPTIONS }
 
-const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const API_BASE = rawBase.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
+const rawBase = process.env.NEXT_PUBLIC_API_URL || ''
+const API_BASE = rawBase ? rawBase.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') : ''
 
 async function tryFetch<T>(url: string, options?: RequestInit, fallbackData?: T): Promise<T> {
   try {

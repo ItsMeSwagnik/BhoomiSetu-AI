@@ -49,9 +49,10 @@ export default function PdfViewer({ documentId, fileUrl, originalFilename }: Pdf
   const handleResetZoom = () => setZoom(100)
   const handleRotate = () => setRotation((r) => (r + 90) % 360)
 
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
   const directUrl = fileUrl 
-    ? (fileUrl.startsWith('http') ? fileUrl : `http://localhost:8000${fileUrl}`)
-    : (documentId ? `http://localhost:8000/api/documents/${documentId}/file` : null)
+    ? (fileUrl.startsWith('http') || fileUrl.startsWith('blob:') ? fileUrl : `${apiBase}${fileUrl}`)
+    : (documentId ? `${apiBase}/api/documents/${documentId}/file` : null)
 
   return (
     <div className="h-full flex flex-col bg-gray-900 rounded-xl overflow-hidden border border-gray-800 text-gray-200">

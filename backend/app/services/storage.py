@@ -4,9 +4,21 @@ from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
 from app.config import settings
 
-# Setup local storage dir
-STORAGE_DIR = Path(settings.storage_local_path) / "documents"
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+# Setup local storage dir with serverless /tmp fallback
+def _resolve_storage_dir() -> Path:
+    candidates = [
+        Path(settings.storage_local_path) / "documents",
+        Path("/tmp") / "storage" / "documents",
+    ]
+    for p in candidates:
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except Exception:
+            continue
+    return Path("/tmp")
+
+STORAGE_DIR = _resolve_storage_dir()
 
 # Firebase / Firestore / Cloud Storage state
 _firestore_db = None

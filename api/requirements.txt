@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+uvicorn>=0.32.0
+sqlalchemy>=2.0.30
+psycopg[binary]>=3.1
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+python-multipart>=0.0.18
+pillow>=11.0.0
+pymupdf>=1.25.0
+rapidfuzz>=3.10.0
+python-dotenv>=1.0.1
+httpx>=0.28.0
