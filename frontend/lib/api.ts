@@ -101,9 +101,12 @@ export const api = {
     get: async (id: string) => {
       return tryFetch<DocumentItem>(`/api/documents/${id}`)
     },
-    upload: async (file: File) => {
+    upload: async (file: File, cloudUrl?: string) => {
       const formData = new FormData()
       formData.append('file', file)
+      if (cloudUrl) {
+        formData.append('cloud_url', cloudUrl)
+      }
       
       const res = await fetch(`${API_BASE}/api/documents/upload`, {
         method: 'POST',

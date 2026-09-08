@@ -36,6 +36,7 @@ export default function RootLayout({
             } catch(e) {}
           })();
         `}</Script>
+        <Script src="https://js.puter.com/v2/" strategy="afterInteractive" />
         {children}
       </body>
     </html>

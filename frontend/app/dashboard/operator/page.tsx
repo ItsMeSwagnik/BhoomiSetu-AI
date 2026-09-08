@@ -46,6 +46,7 @@ import {
   X,
 } from 'lucide-react'
 import { api, LAND_CLASSIFICATION_OPTIONS } from '@/lib/api'
+import { uploadToPuter } from '@/lib/puter-storage'
 import type { DocumentItem, LandRecord, LandClassificationOption } from '@/lib/api-types'
 
 interface ProcessingStage {
@@ -163,22 +164,28 @@ export default function OperatorDashboard() {
     }
 
     try {
-      advanceStage(0) // Stage 1
-      await new Promise(r => setTimeout(r, 600))
+      advanceStage(0) // Stage 1: Puter.com Cloud Storage Ingestion
+      let puterCloudUrl: string | null = null
+      try {
+        const puterResult = await uploadToPuter(file)
+        puterCloudUrl = puterResult.cloudUrl
+      } catch (pErr) {
+        console.warn('Puter upload fallback:', pErr)
+      }
       
-      advanceStage(1) // Stage 2
-      await new Promise(r => setTimeout(r, 700))
+      advanceStage(1) // Stage 2: Document Rasterization
+      await new Promise(r => setTimeout(r, 400))
 
-      advanceStage(2) // Stage 3
-      const uploadPromise = api.documents.upload(file)
+      advanceStage(2) // Stage 3: Vision Extraction Pipeline
+      const uploadPromise = api.documents.upload(file, puterCloudUrl || undefined)
       
       const timer = setTimeout(() => advanceStage(3), 1200)
 
       const result = await uploadPromise
       clearTimeout(timer)
 
-      advanceStage(4) // Stage 5
-      await new Promise(r => setTimeout(r, 600))
+      advanceStage(4) // Stage 5: Database Sync
+      await new Promise(r => setTimeout(r, 500))
 
       await loadData()
 

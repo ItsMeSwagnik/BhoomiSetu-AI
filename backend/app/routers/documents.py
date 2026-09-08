@@ -1,5 +1,4 @@
-import os
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -16,6 +15,7 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
+    cloud_url: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     try:
@@ -24,13 +24,14 @@ async def upload_document(
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
         # 1. Save file to storage / firestore
-        file_id, local_path, file_url = storage_service.save_file(contents, file.filename)
+        file_id, local_path, default_file_url = storage_service.save_file(contents, file.filename)
+        effective_file_url = cloud_url or default_file_url
 
         # 2. Check if this Dalil/Document already exists to guarantee 1 Dalil = 1 Case
         doc = db.query(Document).filter(Document.original_filename == file.filename).first()
         if doc:
             doc.file_path = local_path
-            doc.file_url = file_url
+            doc.file_url = effective_file_url
             doc.file_size = len(contents)
             doc.mime_type = file.content_type or "application/pdf"
             doc.status = "processing"
@@ -40,7 +41,7 @@ async def upload_document(
                 filename=os.path.basename(local_path),
                 original_filename=file.filename,
                 file_path=local_path,
-                file_url=file_url,
+                file_url=effective_file_url,
                 file_size=len(contents),
                 mime_type=file.content_type or "application/pdf",
                 status="processing"
