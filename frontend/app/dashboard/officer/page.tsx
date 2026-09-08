@@ -126,10 +126,10 @@ export default function OfficerDashboard() {
                 </div>
                 <div className="dash-table" style={{ marginBottom: 12 }}>
                   {[
-                    ['Owner', rec.owner], ['Plot', rec.plotNumber], ['Area', `${rec.area} ${rec.areaUnit}`],
-                    ['Village', rec.village], ['District', rec.district], ['Classification', rec.landClassification],
-                    ...(rec.previousOwner ? [['Previous Owner', rec.previousOwner]] : []),
-                    ...(rec.mutationNumber ? [['Mutation No.', rec.mutationNumber]] : []),
+                    ['Owner', String(rec.owner || '')], ['Plot', String(rec.plotNumber || '')], ['Area', `${rec.area || ''} ${rec.areaUnit || ''}`],
+                    ['Village', String(rec.village || '')], ['District', String(rec.district || '')], ['Classification', Array.isArray(rec.landClassification) ? rec.landClassification.join(', ') : String(rec.landClassification || '')],
+                    ...(rec.previousOwner ? [['Previous Owner', String(rec.previousOwner)]] : []),
+                    ...(rec.mutationNumber ? [['Mutation No.', String(rec.mutationNumber)]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="dash-table-row">
                       <span className="dash-table-sub">{k}</span>
@@ -139,7 +139,7 @@ export default function OfficerDashboard() {
                 </div>
                 {rec.validationResults && rec.validationResults.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
-                    {rec.validationResults.map((v, i) => (
+                    {rec.validationResults.map((v: any, i: number) => (
                       <div key={i} className={`auth-status-msg ${v.status === 'fail' ? 'error' : v.status === 'warning' ? 'error' : 'success'}`} style={{ marginBottom: 4 }}>
                         <AlertTriangle size={12} /><span style={{ fontSize: 11 }}>{v.message}</span>
                       </div>

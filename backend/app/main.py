@@ -1,47 +1,89 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-import os
+from sqlalchemy.orm import Session
+from sqlalchemy import text, func
+from contextlib import asynccontextmanager
+
+from app.database import get_db, engine
 from app.config import settings
-from app.database import create_tables
-from app.routers import auth, documents, records, verification, approval, parcels, audit, dashboard, admin, submissions, notifications
+from app.models import Base, Document, LandRecord
+from app.routers import documents, records
 
-app = FastAPI(title="BhoomiSetu AI API", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create DB tables automatically
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[DB] Tables initialized successfully.")
+    except Exception as e:
+        print(f"[DB] Error creating tables: {e}")
+    yield
+
+
+app = FastAPI(
+    title="BhoomiSetu AI - Land Record Digitization API",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# Allow CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-PREFIX = "/api/v1"
-app.include_router(auth.router, prefix=PREFIX)
-app.include_router(documents.router, prefix=PREFIX)
-app.include_router(records.router, prefix=PREFIX)
-app.include_router(verification.router, prefix=PREFIX)
-app.include_router(approval.router, prefix=PREFIX)
-app.include_router(parcels.router, prefix=PREFIX)
-app.include_router(audit.router, prefix=PREFIX)
-app.include_router(dashboard.router, prefix=PREFIX)
-app.include_router(admin.router, prefix=PREFIX)
-app.include_router(submissions.router, prefix=PREFIX)
-app.include_router(notifications.router, prefix=PREFIX)
+app.include_router(documents.router)
+app.include_router(records.router)
 
-# Serve uploaded files
-storage_path = os.path.abspath(settings.storage_local_path)
-if os.path.exists(storage_path):
-    app.mount("/api/v1/files", StaticFiles(directory=storage_path), name="files")
+# Also mount under /api/v1 aliases
+app.include_router(documents.router, prefix="/api/v1")
+app.include_router(records.router, prefix="/api/v1")
 
 
-@app.on_event("startup")
-async def startup():
-    create_tables()
-    os.makedirs(settings.storage_local_path, exist_ok=True)
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint to verify database connection."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
 
-@app.get("/api/health")
-async def health():
-    return {"status": "ok"}
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    total_docs = db.query(Document).count()
+    completed_docs = db.query(Document).filter(Document.status == "extracted").count()
+    processing_docs = db.query(Document).filter(Document.status == "processing").count()
+    failed_docs = db.query(Document).filter(Document.status == "failed").count()
+    total_records = db.query(LandRecord).count()
+    verified_records = db.query(LandRecord).filter(LandRecord.status == "verified").count()
+
+    return {
+        "totalDocuments": total_docs,
+        "completedDocuments": completed_docs,
+        "processingDocuments": processing_docs,
+        "failedDocuments": failed_docs,
+        "totalRecords": total_records,
+        "verifiedRecords": verified_records,
+    }
+
+
+@app.get("/api/dashboard/district-progress")
+def get_district_progress(db: Session = Depends(get_db)):
+    results = (
+        db.query(LandRecord.district, func.count(LandRecord.id))
+        .filter(LandRecord.district.isnot(None))
+        .group_by(LandRecord.district)
+        .all()
+    )
+    return [{"district": r[0], "count": r[1]} for r in results]
+
+
+@app.get("/")
+def read_root():
+    return {"message": "BhoomiSetu AI Land Record Pipeline API is running."}

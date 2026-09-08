@@ -17,9 +17,11 @@ class Settings(BaseSettings):
     ocr_engine: str = "mock"
     confidence_threshold: float = 0.85
     gis_area_tolerance_percent: float = 10.0
+    groq_api_key: Optional[str] = None
 
     class Config:
         env_file = ".env"
+        extra = "allow"
 
 
 settings = Settings()

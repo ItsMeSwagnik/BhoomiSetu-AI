@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Cpu,
   Database,
   Eye,
@@ -119,6 +121,17 @@ export default function ParcelLifecycle() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isCorrected, setIsCorrected] = useState(false)
   const [activeLang, setActiveLang] = useState<'hindi' | 'bengali' | 'english'>('hindi')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 300
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      })
+    }
+  }
 
   const stepData = LIFECYCLE_STEPS[currentStep - 1]
 
@@ -138,33 +151,53 @@ export default function ParcelLifecycle() {
       </div>
 
       {/* Progress Capsule Bar */}
-      <div className="mb-10 overflow-x-auto pb-3 no-scrollbar">
-        <div
-          className="flex min-w-max items-center gap-2 p-2 rounded-full border border-stone-300 dark:border-white/10"
-          style={{ background: 'var(--paper)' }}
+      <div className="relative mb-10 group flex items-center w-full">
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-1 md:-left-4 z-10 p-1.5 rounded-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50 dark:hover:bg-stone-700"
         >
-          {LIFECYCLE_STEPS.map((s) => {
-            const isDone = currentStep > s.step
-            const isCurrent = currentStep === s.step
-            return (
-              <button
-                key={s.step}
-                type="button"
-                onClick={() => setCurrentStep(s.step)}
-                className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                  isCurrent
-                    ? 'terra-pill dark'
-                    : isDone
-                    ? 'text-emerald-800 dark:text-emerald-400 font-bold'
-                    : 'text-stone-500 hover:text-stone-900 dark:text-stone-400'
-                }`}
-              >
-                <span>{isDone ? '✓' : s.step}</span>
-                <span className="hidden md:inline">{s.title}</span>
-              </button>
-            )
-          })}
+          <ChevronLeft size={16} />
+        </button>
+
+        <div 
+          ref={scrollContainerRef}
+          className="overflow-x-auto w-full [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          <div
+            className="flex min-w-max items-center gap-2 p-2 rounded-full border border-stone-300 dark:border-white/10 mx-auto w-fit"
+            style={{ background: 'var(--paper)' }}
+          >
+            {LIFECYCLE_STEPS.map((s) => {
+              const isDone = currentStep > s.step
+              const isCurrent = currentStep === s.step
+              return (
+                <button
+                  key={s.step}
+                  type="button"
+                  onClick={() => setCurrentStep(s.step)}
+                  className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    isCurrent
+                      ? 'terra-pill dark'
+                      : isDone
+                      ? 'text-emerald-800 dark:text-emerald-400 font-bold'
+                      : 'text-stone-500 hover:text-stone-900 dark:text-stone-400'
+                  }`}
+                >
+                  <span>{isDone ? '✓' : s.step}</span>
+                  <span className="hidden md:inline">{s.title}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
+
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-1 md:-right-4 z-10 p-1.5 rounded-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50 dark:hover:bg-stone-700"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       {/* Main Workspace Stage Box */}

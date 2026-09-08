@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import DashboardShell from '@/components/dashboard-shell'
 import { AlertTriangle, Check, CheckCircle2, Eye, FileCheck2, Layers, X } from 'lucide-react'
-import { api, LandRecord, ExtractedField, FieldCorrection } from '@/lib/api'
+import { api } from '@/lib/api'
+import type { LandRecord, ExtractedField, FieldCorrection } from '@/lib/api-types'
 
 export default function VerifierDashboard() {
   const [section, setSection] = useState('Overview')
@@ -131,13 +132,13 @@ export default function VerifierDashboard() {
                   <button className="dash-outline-btn" onClick={() => setSelected(null)}><X size={13} /></button>
                 </div>
               </div>
-              {selected.validationResults?.map((v, i) => (
+              {selected.validationResults?.map((v: any, i: number) => (
                 <div key={i} className={`auth-status-msg ${v.status === 'fail' ? 'error' : v.status === 'warning' ? 'error' : 'success'}`} style={{ marginBottom: 8 }}>
                   <AlertTriangle size={13} /><span>{v.message}</span>
                 </div>
               ))}
               <div className="dash-table" style={{ marginTop: 12 }}>
-                {(selected.extractedFields || []).map((f: ExtractedField) => (
+                {(selected.extractedFields || []).map((f: any) => (
                   <div key={f.id} className="dash-table-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
@@ -200,7 +201,7 @@ export default function VerifierDashboard() {
           <div className="dash-card">
             <h2 className="dash-card-title"><FileCheck2 size={15} /> Correction Log</h2>
             <div className="dash-table">
-              {queue.flatMap(r => (r.extractedFields || []).filter(f => f.isCorrected).map(f => (
+              {queue.flatMap(r => (r.extractedFields || []).filter((f: any) => f.isCorrected).map((f: any) => (
                 <div key={f.id} className="dash-table-row">
                   <div>
                     <span className="dash-table-primary">{f.originalLabel || f.fieldName} — {r.id.slice(0, 8)}</span>
@@ -209,7 +210,7 @@ export default function VerifierDashboard() {
                   <span className="dash-badge verified">Corrected</span>
                 </div>
               )))}
-              {queue.every(r => !(r.extractedFields || []).some(f => f.isCorrected)) && (
+              {queue.every(r => !(r.extractedFields || []).some((f: any) => f.isCorrected)) && (
                 <p className="dash-card-desc" style={{ padding: 12 }}>No corrections yet.</p>
               )}
             </div>

@@ -156,17 +156,17 @@ export default function CitizenDashboard() {
                   </div>
                   <span className={`dash-badge ${p.status}`}>{p.status}</span>
                 </div>
-                <div className="dash-table" style={{ marginTop: '14px' }}>
-                  {[
-                    ['Owner', p.owner], ['Village', p.village], ['District', p.district],
-                    ['Area', `${p.area} ${p.areaUnit}`], ['Classification', p.landClassification],
-                  ].map(([k, v]) => (
-                    <div key={k} className="dash-table-row">
-                      <span className="dash-table-sub">{k}</span>
-                      <span className="dash-table-primary" style={{ fontSize: '12px' }}>{v}</span>
-                    </div>
-                  ))}
-                </div>
+                  <div className="dash-table" style={{ marginTop: '14px' }}>
+                    {[
+                      ['Owner', String(p.owner || '')], ['Village', String(p.village || '')], ['District', String(p.district || '')],
+                      ['Area', `${p.area || ''} ${p.areaUnit || ''}`], ['Classification', Array.isArray(p.landClassification) ? p.landClassification.join(', ') : String(p.landClassification || '')],
+                    ].map(([k, v]) => (
+                      <div key={k} className="dash-table-row">
+                        <span className="dash-table-sub">{k}</span>
+                        <span className="dash-table-primary" style={{ fontSize: '12px' }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
               </div>
             ))}
             {myRecords.length === 0 && <p className="dash-card-desc" style={{ padding: 12 }}>No parcels found.</p>}
