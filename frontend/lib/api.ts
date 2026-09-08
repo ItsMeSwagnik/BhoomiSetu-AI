@@ -1,12 +1,14 @@
 import {
   UserProfile, DocumentItem, LandRecord, Parcel, AuditEntry,
   SystemLog, Submission, AppNotification, FieldCorrection, ValidationResult, ExtractedField,
+  FieldVerification, ValidationScorecard,
   LAND_CLASSIFICATION_OPTIONS, LandClassificationOption
 } from './api-types'
 
 export type {
   UserProfile, DocumentItem, LandRecord, Parcel, AuditEntry,
   SystemLog, Submission, AppNotification, FieldCorrection, ValidationResult, ExtractedField,
+  FieldVerification, ValidationScorecard,
   LandClassificationOption
 }
 export { LAND_CLASSIFICATION_OPTIONS }
@@ -151,15 +153,25 @@ export const api = {
         method: 'DELETE',
       })
     },
+    validate: async (id: string) => {
+      return tryFetch<{ success: boolean; isValidated: boolean; fidelityScore: number; fidelityGrade: string; discrepancies: string[]; record: LandRecord }>(`/api/records/${id}/validate`, {
+        method: 'POST',
+      })
+    },
     history: async (id?: string) => [] as AuditEntry[],
   },
 
   verification: {
     queue: async () => {
-      return tryFetch<LandRecord[]>('/api/records?status=extracted', {}, [])
+      return tryFetch<LandRecord[]>('/api/records', {}, [])
     },
     get: async (id: string) => {
       return tryFetch<LandRecord>(`/api/records/${id}`)
+    },
+    validate: async (id: string) => {
+      return tryFetch<{ success: boolean; isValidated: boolean; fidelityScore: number; fidelityGrade: string; discrepancies: string[]; record: LandRecord }>(`/api/records/${id}/validate`, {
+        method: 'POST',
+      })
     },
     submit: async (id?: string, corrections?: any) => {
       if (id) {

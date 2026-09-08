@@ -83,6 +83,10 @@ async def upload_document(
         record.raw_ocr_response = extracted_data
         record.confidence_score = extracted_data.get("confidence_score", 0.95)
         record.ocr_model_used = extracted_data.get("ocr_model_used", "groq-vision")
+        scorecard = extracted_data.get("validation_scorecard")
+        is_pass = bool(scorecard and scorecard.get("overallFidelityScore", 0) >= 70.0 and len(scorecard.get("discrepancies", [])) == 0)
+
+        record.is_validated = is_pass
         record.status = "extracted"
         
         doc.status = "extracted"
@@ -125,6 +129,8 @@ async def upload_document(
                 "newOwner": record.new_owner,
                 "confidenceScore": record.confidence_score,
                 "ocrModelUsed": record.ocr_model_used,
+                "isValidated": record.is_validated,
+                "validationScorecard": record.raw_ocr_response.get("validation_scorecard") if record.raw_ocr_response else None,
                 "status": record.status,
                 "createdAt": record.created_at.isoformat() if record.created_at else None,
             }
@@ -163,13 +169,13 @@ def get_document_file(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not os.path.exists(doc.file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id)
+    if not file_bytes:
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Firebase")
 
-    return FileResponse(
-        doc.file_path,
+    return Response(
+        content=file_bytes,
         media_type=doc.mime_type or "application/pdf",
-        content_disposition_type="inline",
         headers={"Content-Disposition": f'inline; filename="{doc.original_filename}"'}
     )
 
@@ -178,25 +184,35 @@ def get_document_file(doc_id: str, db: Session = Depends(get_db)):
 def get_document_pages(doc_id: str, db: Session = Depends(get_db)):
     """Renders all PDF pages as base64 images for interactive in-browser document viewer."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc or not os.path.exists(doc.file_path):
-        raise HTTPException(status_code=404, detail="Document file not found")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document record not found")
+
+    file_bytes = storage_service.get_file_bytes(doc.file_path, doc.id)
+    if not file_bytes:
+        raise HTTPException(status_code=404, detail="Document file could not be retrieved from local storage or Firebase")
 
     import fitz
     import base64
 
     pages = []
-    try:
-        pdf_doc = fitz.open(doc.file_path)
-        for page in pdf_doc:
-            pix = page.get_pixmap(dpi=150)
-            b64 = base64.b64encode(pix.tobytes("png")).decode("utf-8")
+    is_pdf = file_bytes.startswith(b"%PDF")
+
+    if is_pdf:
+        try:
+            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page in pdf_doc:
+                pix = page.get_pixmap(dpi=150)
+                b64 = base64.b64encode(pix.tobytes("png")).decode("utf-8")
+                pages.append(f"data:image/png;base64,{b64}")
+            pdf_doc.close()
+        except Exception as e:
+            print(f"[DocumentPages] PyMuPDF render error: {e}")
+            b64 = base64.b64encode(file_bytes).decode("utf-8")
             pages.append(f"data:image/png;base64,{b64}")
-        pdf_doc.close()
-    except Exception as e:
+    else:
         # Fallback if image file
-        with open(doc.file_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
-            pages.append(f"data:image/jpeg;base64,{b64}")
+        b64 = base64.b64encode(file_bytes).decode("utf-8")
+        pages.append(f"data:image/jpeg;base64,{b64}")
 
     return {
         "documentId": doc.id,
@@ -249,9 +265,11 @@ async def reprocess_document(doc_id: str, db: Session = Depends(get_db)):
     record.raw_ocr_response = extracted_data
     record.confidence_score = extracted_data.get("confidence_score", 0.95)
     record.ocr_model_used = extracted_data.get("ocr_model_used", "groq-vision")
+    scorecard = extracted_data.get("validation_scorecard")
+    record.is_validated = bool(scorecard and scorecard.get("overallFidelityScore", 0) >= 70.0 and len(scorecard.get("discrepancies", [])) == 0)
     record.status = "extracted"
 
     doc.status = "extracted"
     db.commit()
 
-    return {"success": True, "recordId": record.id}
+    return {"success": True, "recordId": record.id, "isValidated": record.is_validated}

@@ -46,6 +46,31 @@ export interface ValidationResult {
   message: string
 }
 
+export interface FieldVerification {
+  field: string
+  label: string
+  extractedValue: string
+  matchStatus: 'VERIFIED_MATCH' | 'PROBABLE_MATCH' | 'UNVERIFIED_IN_TEXT' | 'DISCREPANCY'
+  matchScore: number
+  matchType: string
+  pdfContextSnippet?: string
+  pageNumber?: number
+  notes?: string
+}
+
+export interface ValidationScorecard {
+  overallFidelityScore: number
+  fidelityGrade: 'A+' | 'A' | 'B' | 'C' | 'FLAGGED'
+  verifiedFieldsCount: number
+  partialFieldsCount: number
+  flaggedFieldsCount: number
+  totalFieldsChecked: number
+  isPdfTextLayerAvailable: boolean
+  discrepancies: string[]
+  fieldVerifications: FieldVerification[]
+  timestamp: string
+}
+
 export interface LandRecord {
   id: string
   documentId?: string
@@ -72,7 +97,9 @@ export interface LandRecord {
   newOwner?: string
   confidenceScore?: number
   ocrModelUsed?: string
+  isValidated?: boolean
   rawOcrResponse?: Record<string, any>
+  validationScorecard?: ValidationScorecard
   status: string
   createdAt?: string
   updatedAt?: string

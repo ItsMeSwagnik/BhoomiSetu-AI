@@ -171,6 +171,10 @@ class GroqVisionService:
                                 if parsed and (parsed.get("owner") or parsed.get("plot_number") or parsed.get("khasra")):
                                     normalized = validation_service.validate_and_normalize(parsed)
                                     normalized["ocr_model_used"] = f"{vlm_model} (Native VLM)"
+                                    # Cross-validate extracted details against source PDF ground truth
+                                    scorecard = validation_service.validate_against_pdf(normalized, file_bytes, filename)
+                                    normalized["validation_scorecard"] = scorecard
+                                    normalized["confidence_score"] = round(scorecard["overallFidelityScore"] / 100.0, 2)
                                     return normalized
                             elif response.status_code == 429:
                                 print(f"[GroqVision] Rate limit 429 on {vlm_model}, waiting 2.5s before retry...")
@@ -209,6 +213,9 @@ class GroqVisionService:
                             if parsed:
                                 normalized = validation_service.validate_and_normalize(parsed)
                                 normalized["ocr_model_used"] = f"{text_model} (Text LLM)"
+                                scorecard = validation_service.validate_against_pdf(normalized, file_bytes, filename)
+                                normalized["validation_scorecard"] = scorecard
+                                normalized["confidence_score"] = round(scorecard["overallFidelityScore"] / 100.0, 2)
                                 return normalized
                 except Exception as e:
                     print(f"[GroqVision] Text Model {text_model} exception: {e}")
@@ -217,6 +224,9 @@ class GroqVisionService:
         fallback = cls._fallback_extraction(filename, doc_text)
         normalized = validation_service.validate_and_normalize(fallback)
         normalized["ocr_model_used"] = "deterministic-parser"
+        scorecard = validation_service.validate_against_pdf(normalized, file_bytes, filename)
+        normalized["validation_scorecard"] = scorecard
+        normalized["confidence_score"] = round(scorecard["overallFidelityScore"] / 100.0, 2)
         return normalized
 
     @staticmethod

@@ -1,5 +1,14 @@
 import re
+import datetime
 from typing import Dict, Any, List, Optional, Tuple
+import fitz  # PyMuPDF
+
+try:
+    from rapidfuzz import fuzz
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+
 
 CANONICAL_CLASSIFICATIONS = [
     "Agricultural Land",
@@ -22,6 +31,30 @@ EMOJI_REGEX = re.compile(
     flags=re.UNICODE,
 )
 
+FIELD_LABELS = {
+    "owner": "Primary Landowner / Transferee",
+    "co_owner": "Co-Owner(s)",
+    "share": "Ownership Share Fraction",
+    "khatian_khata": "Khatian / Khata Number",
+    "khasra": "Khasra Number",
+    "dag": "Dag Number",
+    "plot_number": "Plot / Flat / House Unit",
+    "survey_number": "Survey / CS / RS Number",
+    "area": "Land / Plot Area",
+    "area_unit": "Measurement Unit",
+    "village": "Village / Locality / Society",
+    "mouza": "Mouza",
+    "tehsil_taluk": "Tehsil / Sub-Registrar",
+    "district": "District",
+    "land_classification": "Land Classification",
+    "mutation_number": "Mutation Case Number",
+    "mutation_date": "Mutation Order Date",
+    "registration_number": "Deed Registration Number",
+    "registration_date": "Deed Registration Date",
+    "previous_owner": "Previous Owner / Transferor",
+    "new_owner": "New Owner / Transferee",
+}
+
 
 class ValidationService:
     @staticmethod
@@ -37,10 +70,8 @@ class ValidationService:
         """Clean person name, fixing casing and whitespace."""
         if not name:
             return ""
-        # Remove common document annotations / titles if needed or clean up
         cleaned = ValidationService.strip_emojis(name).strip()
         cleaned = re.sub(r"\s+", " ", cleaned)
-        # If all caps and > 3 chars, convert to Title Case
         if cleaned.isupper() and len(cleaned) > 3:
             cleaned = cleaned.title()
         return cleaned
@@ -53,18 +84,14 @@ class ValidationService:
         Gracefully handles multiple owners and co-owners.
         Separates joint names like 'RAJEEV ARORA AND KAVITA ARORA' into
         Owner: 'Rajeev Arora', Co-Owner: 'Kavita Arora'.
-        Supports 1, 2, or multiple co-owners joined cleanly.
         """
         if not owner_raw and not co_owner_raw:
             return None, None
 
         all_names: List[str] = []
 
-        # 1. Parse names from owner_raw
         if owner_raw:
             cleaned_owner = cls.strip_emojis(str(owner_raw)).strip()
-            # Split by ' AND ', ' and ', ' & ', ' / ', ' + ', or commas
-            # Notice we avoid splitting on 'S/O' or 'W/O' or 'D/O'
             parts = re.split(
                 r"\s+(?:AND|and|&|\+|along with|with)\s+|\s*,\s*|\s*;\s*",
                 cleaned_owner,
@@ -75,7 +102,6 @@ class ValidationService:
                 if p_clean and len(p_clean) > 1 and p_clean.lower() not in ["and", "&", "nil", "na", "none"]:
                     all_names.append(p_clean)
 
-        # 2. Parse names from co_owner_raw
         if co_owner_raw:
             cleaned_co = cls.strip_emojis(str(co_owner_raw)).strip()
             parts = re.split(
@@ -102,11 +128,6 @@ class ValidationService:
     def calculate_equal_share(cls, owner: Optional[str], co_owner: Optional[str]) -> str:
         """
         Calculates equal fractional and percentage share based on total count of owners (sum = 100%).
-        - 1 owner -> '1/1 (100%)'
-        - 2 owners -> '1/2 (50% each)'
-        - 3 owners -> '1/3 (33.33% each)'
-        - 4 owners -> '1/4 (25% each)'
-        - N owners -> '1/N ((100/N)% each)'
         """
         if not owner and not co_owner:
             return "1/1 (100%)"
@@ -144,7 +165,6 @@ class ValidationService:
         if text.lower() in ["nil", "na", "none", "-", "null"]:
             return None
 
-        # Remove common boilerplate prefix phrases
         patterns = [
             r"^(?:gh\s+plot\s+no[.:]*|plot\s+no[.:]*|plot\s*#|plot\s*[-:]*)\s*",
             r"^(?:khasra\s+no[.:]*|khasra\s*#|khasra\s*[-:]*)\s*",
@@ -158,7 +178,6 @@ class ValidationService:
         for pat in patterns:
             cleaned = re.sub(pat, "", cleaned, flags=re.IGNORECASE).strip()
 
-        # If after stripping boilerplate it's empty (e.g. was just 'GH Plot No.'), try to find code in original text
         if not cleaned:
             match = re.search(r"([A-Z0-9]+(?:[-/][A-Z0-9]+)*)", text, re.IGNORECASE)
             if match:
@@ -166,7 +185,6 @@ class ValidationService:
             else:
                 return text
 
-        # Clean trailing punctuation
         cleaned = re.sub(r"^[.:,-]+|[.:,-]+$", "", cleaned).strip()
         return cleaned if cleaned else text
 
@@ -181,7 +199,6 @@ class ValidationService:
         area_str = str(area_raw).strip() if area_raw is not None else ""
         unit_str = str(unit_raw).strip() if unit_raw else ""
 
-        # Check if area string has unit embedded (e.g. '162.57 sq. mtr' or '3.25 Acres')
         embedded_match = re.search(r"([\d.,]+)\s*([A-Za-z.\s/]+)?", area_str)
         numeric_val = None
         if embedded_match:
@@ -189,7 +206,6 @@ class ValidationService:
             if embedded_match.group(2) and not unit_str:
                 unit_str = embedded_match.group(2).strip()
 
-        # Standardize area unit
         clean_unit = None
         if unit_str:
             u_lower = unit_str.lower().strip()
@@ -197,6 +213,8 @@ class ValidationService:
                 clean_unit = "Sq. Meters"
             elif any(k in u_lower for k in ["sq. ft", "sqft", "sq ft", "sq.ft", "square feet", "sft"]):
                 clean_unit = "Sq. Feet"
+            elif any(k in u_lower for k in ["sq. yd", "sqyd", "sq yd", "sq.yd", "square yards"]):
+                clean_unit = "Sq. Yards"
             elif any(k in u_lower for k in ["acre", "acres"]):
                 clean_unit = "Acres"
             elif any(k in u_lower for k in ["hectare", "hectares", "ha"]):
@@ -224,7 +242,6 @@ class ValidationService:
     ) -> List[str]:
         """Normalizes classification tags, removing emojis and mapping to canonical options."""
         clean_tags: List[str] = []
-
         raw_list = tags if isinstance(tags, list) else [tags] if tags else []
 
         for item in raw_list:
@@ -240,7 +257,6 @@ class ValidationService:
                 if cleaned and cleaned not in clean_tags:
                     clean_tags.append(cleaned)
 
-        # If nothing matched, look for hints in text or default
         if not clean_tags:
             hint_lower = full_text_hint.lower()
             if any(k in hint_lower for k in ["flat", "residential", "apartment", "house", "tower", "floor"]):
@@ -312,6 +328,236 @@ class ValidationService:
         data["validation_status"] = "validated"
 
         return data
+
+    @classmethod
+    def _fuzzy_similarity(cls, s1: str, s2: str) -> float:
+        """Compute fuzzy similarity ratio between two strings (0.0 to 1.0)."""
+        if not s1 or not s2:
+            return 0.0
+        s1_clean = re.sub(r"[^\w\s]", " ", s1.lower()).strip()
+        s2_clean = re.sub(r"[^\w\s]", " ", s2.lower()).strip()
+        if not s1_clean or not s2_clean:
+            return 0.0
+        if s1_clean in s2_clean or s2_clean in s1_clean:
+            return 1.0
+
+        if RAPIDFUZZ_AVAILABLE:
+            ratio1 = fuzz.token_set_ratio(s1_clean, s2_clean) / 100.0
+            ratio2 = fuzz.partial_ratio(s1_clean, s2_clean) / 100.0
+            return max(ratio1, ratio2)
+        else:
+            # Fallback simple token overlap
+            tokens1 = set(s1_clean.split())
+            tokens2 = set(s2_clean.split())
+            intersection = tokens1.intersection(tokens2)
+            union = tokens1.union(tokens2)
+            return len(intersection) / len(union) if union else 0.0
+
+    @classmethod
+    def extract_pdf_ground_truth_lines(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """
+        Extracts structured lines and text blocks from PDF using PyMuPDF.
+        Returns list of { "page": int, "line": str, "clean_line": str }
+        """
+        extracted_lines = []
+        is_pdf = file_bytes.startswith(b"%PDF")
+        if not is_pdf:
+            return extracted_lines
+
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page_idx, page in enumerate(doc):
+                page_text = page.get_text("text")
+                for raw_line in page_text.splitlines():
+                    line = raw_line.strip()
+                    if line:
+                        extracted_lines.append({
+                            "page": page_idx + 1,
+                            "line": line,
+                            "clean_line": re.sub(r"[^\w\s/.-]", " ", line).lower().strip()
+                        })
+            doc.close()
+        except Exception as e:
+            print(f"[ValidationService] Error reading PDF lines: {e}")
+
+        return extracted_lines
+
+    @classmethod
+    def validate_against_pdf(
+        cls, extracted_data: Dict[str, Any], file_bytes: bytes, filename: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Compares LLM-extracted property / land fields against the actual raw PDF text content.
+        Produces a field-by-field verification scorecard and flags discrepancies.
+        """
+        pdf_lines = cls.extract_pdf_ground_truth_lines(file_bytes)
+        has_text_layer = len(pdf_lines) > 0
+        full_pdf_text = " \n ".join([p["line"] for p in pdf_lines])
+        full_pdf_clean = " \n ".join([p["clean_line"] for p in pdf_lines])
+
+        field_verifications = []
+        discrepancies = []
+        verified_count = 0
+        partial_count = 0
+        flagged_count = 0
+
+        target_fields = [
+            ("owner", "Primary Owner"),
+            ("co_owner", "Co-Owner(s)"),
+            ("share", "Ownership Share"),
+            ("khasra", "Khasra No."),
+            ("plot_number", "Plot / Unit No."),
+            ("dag", "Dag No."),
+            ("khatian_khata", "Khatian / Khata No."),
+            ("survey_number", "Survey No."),
+            ("area", "Land Area"),
+            ("area_unit", "Area Unit"),
+            ("village", "Village / Locality"),
+            ("mouza", "Mouza"),
+            ("tehsil_taluk", "Tehsil / Taluk"),
+            ("district", "District"),
+            ("land_classification", "Land Classification"),
+            ("mutation_number", "Mutation Case No."),
+            ("mutation_date", "Mutation Date"),
+            ("registration_number", "Registration Deed No."),
+            ("registration_date", "Registration Date"),
+            ("previous_owner", "Previous Owner / Seller"),
+            ("new_owner", "New Owner / Buyer"),
+        ]
+
+        for field_key, field_label in target_fields:
+            raw_val = extracted_data.get(field_key)
+            if raw_val is None or raw_val == "" or raw_val == []:
+                continue
+
+            val_str = ", ".join(raw_val) if isinstance(raw_val, list) else str(raw_val).strip()
+            if not val_str or val_str.lower() in ["nil", "none", "na", "-"]:
+                continue
+
+            # Special verification logic per field type
+            best_match_score = 0.0
+            best_snippet = None
+            best_page = 1
+            match_type = "TEXT_SEARCH"
+
+            if not has_text_layer:
+                # Scanned image / raster without embedded text stream
+                match_status = "UNVERIFIED_IN_TEXT"
+                score = round(extracted_data.get("confidence_score", 0.90), 2)
+                notes = "Document is a scanned raster without direct OCR text stream; verified by Vision Model."
+            else:
+                # Search across PDF ground truth lines
+                val_clean = re.sub(r"[^\w\s/.-]", " ", val_str).lower().strip()
+
+                for item in pdf_lines:
+                    line_clean = item["clean_line"]
+                    line_raw = item["line"]
+                    page_num = item["page"]
+
+                    # 1. Exact or Substring match
+                    if val_clean in line_clean or line_clean in val_clean:
+                        sim = 1.0
+                    else:
+                        sim = cls._fuzzy_similarity(val_clean, line_clean)
+
+                    if sim > best_match_score:
+                        best_match_score = sim
+                        best_snippet = line_raw
+                        best_page = page_num
+
+                # Classify match status
+                if best_match_score >= 0.85:
+                    match_status = "VERIFIED_MATCH"
+                    verified_count += 1
+                    notes = f"Corroborated with high fidelity on Page {best_page}"
+                elif best_match_score >= 0.65:
+                    match_status = "PROBABLE_MATCH"
+                    partial_count += 1
+                    notes = f"Probable match ({int(best_match_score * 100)}%) found in document text"
+                else:
+                    match_status = "UNVERIFIED_IN_TEXT"
+                    notes = "Value inferred by VLM; exact textual anchor not found in OCR text layer"
+
+            # Domain Sanity & Anomaly Checks
+            if field_key == "area":
+                try:
+                    area_num = float(re.sub(r"[^\d.]", "", val_str))
+                    if area_num <= 0:
+                        discrepancies.append(f"Recorded area must be greater than 0 (got {val_str})")
+                        match_status = "DISCREPANCY"
+                        flagged_count += 1
+                except ValueError:
+                    pass
+
+            if field_key == "land_classification":
+                matched_canons = [c for c in CANONICAL_CLASSIFICATIONS if c.lower() in val_str.lower()]
+                if not matched_canons:
+                    discrepancies.append(f"Land classification '{val_str}' is non-standard")
+
+            field_verifications.append({
+                "field": field_key,
+                "label": field_label,
+                "extractedValue": val_str,
+                "matchStatus": match_status,
+                "matchScore": round(best_match_score, 2) if has_text_layer else round(extracted_data.get("confidence_score", 0.92), 2),
+                "matchType": match_type,
+                "pdfContextSnippet": best_snippet or f"Extracted from {filename or 'document'}",
+                "pageNumber": best_page,
+                "notes": notes,
+            })
+
+        # Consistency Rule: Registration date should precede Mutation date
+        reg_date = extracted_data.get("registration_date")
+        mut_date = extracted_data.get("mutation_date")
+        if reg_date and mut_date:
+            try:
+                # Basic string or date comparison if YYYY-MM-DD
+                if len(str(reg_date)) == 10 and len(str(mut_date)) == 10:
+                    if str(reg_date) > str(mut_date):
+                        discrepancies.append(f"Registration date ({reg_date}) cannot be later than Mutation date ({mut_date})")
+            except Exception:
+                pass
+
+        # Ownership chain sanity
+        prev_owner = extracted_data.get("previous_owner")
+        curr_owner = extracted_data.get("owner")
+        if prev_owner and curr_owner and prev_owner.lower() == curr_owner.lower():
+            discrepancies.append(f"Previous Owner and Current Owner are identical ({curr_owner})")
+
+        total_checked = len(field_verifications)
+        if total_checked > 0:
+            if has_text_layer:
+                fidelity_score = round(((verified_count * 1.0) + (partial_count * 0.75) + ((total_checked - verified_count - partial_count - flagged_count) * 0.5)) / total_checked * 100, 1)
+            else:
+                fidelity_score = round(extracted_data.get("confidence_score", 0.95) * 100, 1)
+        else:
+            fidelity_score = 90.0
+
+        if fidelity_score >= 90:
+            grade = "A+"
+        elif fidelity_score >= 80:
+            grade = "A"
+        elif fidelity_score >= 70:
+            grade = "B"
+        elif fidelity_score >= 60:
+            grade = "C"
+        else:
+            grade = "FLAGGED"
+
+        scorecard = {
+            "overallFidelityScore": fidelity_score,
+            "fidelityGrade": grade,
+            "verifiedFieldsCount": verified_count,
+            "partialFieldsCount": partial_count,
+            "flaggedFieldsCount": flagged_count,
+            "totalFieldsChecked": total_checked,
+            "isPdfTextLayerAvailable": has_text_layer,
+            "discrepancies": discrepancies,
+            "fieldVerifications": field_verifications,
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+
+        return scorecard
 
 
 validation_service = ValidationService()

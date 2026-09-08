@@ -126,11 +126,58 @@ class StorageService:
         return file_id, str(local_path), file_url
 
     @staticmethod
-    def get_file_bytes(file_path: str) -> Optional[bytes]:
+    def get_file_bytes(file_path: str, file_id: Optional[str] = None) -> Optional[bytes]:
+        """
+        Retrieves file bytes from local disk, resolving across candidate folders,
+        or dynamically downloads from Firebase Cloud Storage bucket if not on local disk.
+        """
         path = Path(file_path)
-        if path.exists():
-            with open(path, "rb") as f:
-                return f.read()
+        filename = path.name
+
+        candidates = [
+            path,
+            STORAGE_DIR / filename,
+            Path("storage/documents") / filename,
+            Path("/tmp/storage/documents") / filename,
+        ]
+
+        for p in candidates:
+            if p.exists() and p.is_file():
+                try:
+                    with open(p, "rb") as f:
+                        return f.read()
+                except Exception as read_err:
+                    print(f"[Storage] Error reading local file {p}: {read_err}")
+
+        # Fallback: Download from Firebase Cloud Storage bucket
+        try:
+            db, bucket = init_firebase()
+            if bucket:
+                # Try with filename or file_id
+                blob_names = [f"documents/{filename}"]
+                if file_id:
+                    ext = path.suffix or ".pdf"
+                    blob_names.append(f"documents/{file_id}{ext}")
+                    blob_names.append(f"documents/{file_id}")
+
+                for bname in blob_names:
+                    try:
+                        blob = bucket.blob(bname)
+                        if blob.exists():
+                            file_bytes = blob.download_as_bytes()
+                            # Cache locally
+                            try:
+                                local_cache = STORAGE_DIR / filename
+                                with open(local_cache, "wb") as f:
+                                    f.write(file_bytes)
+                            except Exception:
+                                pass
+                            return file_bytes
+                    except Exception as b_err:
+                        print(f"[Storage] Error downloading blob {bname}: {b_err}")
+        except Exception as fb_err:
+            print(f"[Storage] Firebase bucket retrieve notice: {fb_err}")
+
         return None
 
     @staticmethod

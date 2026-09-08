@@ -790,6 +790,64 @@ export default function OperatorDashboard() {
 
               {/* RIGHT PANE: 20 EXTRACTED FIELDS EDITABLE FORM */}
               <div className="h-full overflow-y-auto p-6 space-y-6">
+                {/* 0. Ground-Truth PDF vs LLM Validation Scorecard */}
+                {activeRecord.validationScorecard && (
+                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                          <ShieldCheck size={16} />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                            PDF Ground-Truth Cross-Validation
+                          </h3>
+                          <p className="text-[11px] text-gray-500">
+                            LLM extractions compared against source PDF text tokens
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono">
+                          Grade {activeRecord.validationScorecard.fidelityGrade} · {activeRecord.validationScorecard.overallFidelityScore}% Fidelity
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="font-bold text-emerald-700 dark:text-emerald-400">
+                          {activeRecord.validationScorecard.verifiedFieldsCount} / {activeRecord.validationScorecard.totalFieldsChecked}
+                        </div>
+                        <div className="text-[10px] text-gray-500">Verified in PDF</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <div className="font-bold text-amber-700 dark:text-amber-400">
+                          {activeRecord.validationScorecard.partialFieldsCount}
+                        </div>
+                        <div className="text-[10px] text-gray-500">Probable Match</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <div className="font-bold text-blue-700 dark:text-blue-400">
+                          {activeRecord.validationScorecard.isPdfTextLayerAvailable ? 'Direct OCR' : 'Raster Vision'}
+                        </div>
+                        <div className="text-[10px] text-gray-500">Text Layer</div>
+                      </div>
+                    </div>
+
+                    {activeRecord.validationScorecard.discrepancies && activeRecord.validationScorecard.discrepancies.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-xs space-y-1">
+                        <div className="font-semibold flex items-center gap-1">
+                          <AlertTriangle size={13} /> Discrepancies & Anomaly Flags:
+                        </div>
+                        {activeRecord.validationScorecard.discrepancies.map((d: string, idx: number) => (
+                          <div key={idx} className="text-[11px] pl-4 list-disc">• {d}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 1. Ownership Details */}
                 <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 space-y-3">
                   <div className="flex items-center justify-between">

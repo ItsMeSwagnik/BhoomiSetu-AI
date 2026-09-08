@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -61,6 +61,7 @@ class LandRecord(Base):
     raw_ocr_response = Column(JSON, nullable=True)
     confidence_score = Column(Float, default=0.95)
     ocr_model_used = Column(String(100), nullable=True)
+    is_validated = Column(Boolean, default=False, nullable=True)  # True if passes PDF ground truth validation, False if fails
     status = Column(String(50), default="extracted")  # extracted, verified, flagged
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
