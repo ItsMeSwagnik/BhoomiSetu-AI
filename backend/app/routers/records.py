@@ -114,7 +114,7 @@ def get_record(record_id: str, db: Session = Depends(get_db)):
 @router.post("/{record_id}/validate")
 def validate_record_against_pdf(record_id: str, db: Session = Depends(get_db)):
     """
-    Fetches the source document/PDF (from Firebase or local storage), runs the
+    Fetches the source document/PDF (from Cloudinary or local storage), runs the
     ground-truth validation engine against LLM extraction, updates the `is_validated`
     database column to True (if passed) or False (if failed), and stores the full scorecard.
     """
@@ -218,6 +218,11 @@ def delete_record(record_id: str, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="Land record not found")
 
+    doc_id = record.document_id
     db.delete(record)
+    if doc_id:
+        doc = db.query(Document).filter(Document.id == doc_id).first()
+        if doc:
+            db.delete(doc)
     db.commit()
-    return {"success": True, "message": "Record deleted"}
+    return {"success": True, "message": "Record and associated document deleted"}

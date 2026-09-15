@@ -214,6 +214,11 @@ def delete_record(record_id: str, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="Land record not found")
 
+    doc_id = record.document_id
     db.delete(record)
+    if doc_id:
+        doc = db.query(Document).filter(Document.id == doc_id).first()
+        if doc:
+            db.delete(doc)
     db.commit()
-    return {"success": True, "message": "Record deleted"}
+    return {"success": True, "message": "Record and associated document deleted"}

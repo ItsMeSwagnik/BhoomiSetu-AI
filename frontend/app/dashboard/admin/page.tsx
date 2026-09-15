@@ -12,6 +12,8 @@ const PIPELINES = [
   { id: 'pl4', name: 'RapidFuzz Entity Matcher', status: 'Idle', accuracy: '88.5%' },
 ]
 
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+
 export default function AdminDashboard() {
   const [section, setSection] = useState('Overview')
   const [users, setUsers] = useState<UserProfile[]>([])
@@ -102,7 +104,11 @@ export default function AdminDashboard() {
             ].map((s) => (
               <div key={s.label} className="dash-stat-card">
                 <s.icon size={18} className={`dash-stat-icon ${s.color}`} />
-                <p className="dash-stat-value">{s.value}</p>
+                {loading ? (
+                  <Skeleton className="w-16 h-7 rounded my-1" />
+                ) : (
+                  <p className="dash-stat-value">{s.value}</p>
+                )}
                 <span className="dash-stat-label">{s.label}</span>
               </div>
             ))}
@@ -110,7 +116,11 @@ export default function AdminDashboard() {
           <div className="dash-grid-2">
             <div className="dash-card">
               <h2 className="dash-card-title"><Users size={15} /> Users ({users.length})</h2>
-              {loading ? <p className="dash-card-desc" style={{ padding: 12 }}>Loading…</p> : (
+              {loading ? (
+                <div className="p-3">
+                  <SkeletonList count={3} />
+                </div>
+              ) : (
                 <div className="dash-table">
                   {users.slice(0, 4).map((u) => (
                     <div key={u.id} className="dash-table-row">

@@ -1,11 +1,11 @@
 export interface UserProfile {
   id: string
-  firebaseUid: string
   name: string
   email: string
   role: string
   status: string
   createdAt: string
+  firebaseUid?: string
 }
 
 export interface DocumentItem {
@@ -187,4 +187,49 @@ export interface FieldCorrection {
   fieldId: string
   correctedValue: string
   reason?: string
+}
+
+export interface LinkedDalilSummary {
+  id: string
+  khasra?: string
+  owner?: string
+  district?: string
+  mouza?: string
+  area?: string
+  status?: string
+}
+
+export interface MapPlotItem {
+  id: string
+  mapId: string
+  plotNumber?: string
+  geometryWkt: string
+  polygonCoordinates: [number, number][]
+  centroidX?: number | null
+  centroidY?: number | null
+  calculatedAreaPx?: number | null
+  confidenceScore: number
+  status: 'extracted' | 'flagged' | 'verified' | 'assigned' | 'manual'
+  dalilId?: string | null
+  linkedDalil?: LinkedDalilSummary | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CadastralMapItem {
+  id: string
+  state: string
+  district: string
+  mouzaName: string
+  mouzaNo?: string | null
+  cloudinaryUrl: string
+  cloudinaryPublicId?: string | null
+  imageWidth?: number | null
+  imageHeight?: number | null
+  scaleFactor?: number | null
+  status: 'processing' | 'ready' | 'failed'
+  uploadedBy?: string | null
+  uploadedAt?: string
+  plotsCount?: number
+  plots?: MapPlotItem[]
 }

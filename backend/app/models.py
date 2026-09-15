@@ -67,3 +67,44 @@ class LandRecord(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     document = relationship("Document", back_populates="records")
+
+
+class CadastralMap(Base):
+    __tablename__ = "cadastral_maps"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    state = Column(String(100), nullable=True)
+    district = Column(String(100), nullable=False)
+    mouza_name = Column(String(255), nullable=False)
+    mouza_no = Column(String(100), nullable=True)  # JL Number
+    cloudinary_url = Column(String(1024), nullable=False)
+    cloudinary_public_id = Column(String(255), nullable=True)
+    image_width = Column(Integer, default=2000)
+    image_height = Column(Integer, default=1500)
+    uploaded_by = Column(String(100), default="operator")
+    status = Column(String(50), default="extracted")  # uploaded, processing, extracted, completed, failed
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    plots = relationship("MapPlot", back_populates="cadastral_map", cascade="all, delete-orphan", order_by="MapPlot.plot_number")
+
+
+class MapPlot(Base):
+    __tablename__ = "map_plots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    map_id = Column(String(36), ForeignKey("cadastral_maps.id", ondelete="CASCADE"), nullable=False)
+    plot_number = Column(String(100), nullable=False)
+    geometry_wkt = Column(Text, nullable=False)  # Canonical WKT POLYGON((...)) in pixel space
+    centroid_x = Column(Float, nullable=True)
+    centroid_y = Column(Float, nullable=True)
+    area_pixels = Column(Float, nullable=True)
+    status = Column(String(50), default="detected")  # detected, assigned, flagged, verified
+    dalil_id = Column(String(36), ForeignKey("land_records.id", ondelete="SET NULL"), nullable=True)
+    confidence_score = Column(Float, default=0.92)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    cadastral_map = relationship("CadastralMap", back_populates="plots")
+    dalil_record = relationship("LandRecord")

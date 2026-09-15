@@ -212,6 +212,7 @@ function getDashboardLinks(role: UserRole) {
     operator: [
       { label: 'Overview', icon: BarChart3 },
       { label: 'Upload Documents', icon: Upload },
+      { label: 'Mouza Maps (GIS)', icon: Map },
       { label: 'OCR Queue', icon: FileText },
       { label: 'Batch Status', icon: Database },
     ],

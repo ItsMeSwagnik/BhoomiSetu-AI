@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from app.database import get_db, engine
 from app.config import settings
 from app.models import Base, Document, LandRecord
-from app.routers import documents, records
+from app.routers import documents, records, cadastral_maps
 
 
 @asynccontextmanager
@@ -38,10 +38,12 @@ app.add_middleware(
 
 app.include_router(documents.router)
 app.include_router(records.router)
+app.include_router(cadastral_maps.router)
 
 # Also mount under /api/v1 aliases
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(records.router, prefix="/api/v1")
+app.include_router(cadastral_maps.router, prefix="/api/v1")
 
 
 @app.get("/health")

@@ -47,6 +47,8 @@ import {
 } from 'lucide-react'
 import { api, LAND_CLASSIFICATION_OPTIONS } from '@/lib/api'
 import type { DocumentItem, LandRecord, LandClassificationOption } from '@/lib/api-types'
+import { Skeleton, SkeletonTable } from '@/components/ui/skeleton'
+import { MouzaMapStudio } from '@/components/mouza-map-studio'
 
 interface ProcessingStage {
   id: number
@@ -109,8 +111,8 @@ export default function OperatorDashboard() {
     { id: 5, title: 'Database Synchronization', desc: 'Writing structured record to Neon PostgreSQL', status: currentStageIdx > 4 ? 'completed' : currentStageIdx === 4 ? 'active' : 'pending' },
   ]
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     try {
       const [docsData, recordsData, statsData] = await Promise.all([
         api.documents.list(),
@@ -123,9 +125,70 @@ export default function OperatorDashboard() {
     } catch (err) {
       console.error('Failed loading dashboard data', err)
     } finally {
-      setLoading(false)
+      if (showSpinner) setLoading(false)
     }
   }, [])
+
+  const handleDeleteRecord = async (e: React.MouseEvent, rec: LandRecord) => {
+    e.stopPropagation()
+    if (!confirm(`Delete case for ${rec.owner || 'this record'}?`)) return
+
+    const targetId = rec.id
+    const targetDocId = rec.documentId
+
+    // 1. Instant optimistic UI update
+    setRecords(prev => prev.filter(r => r.id !== targetId))
+    setQueue(prev => prev.filter(d => d.recordId !== targetId && d.id !== targetDocId))
+    setStats(prev => ({
+      ...prev,
+      totalRecords: Math.max(0, (prev.totalRecords || 1) - 1),
+      totalDocuments: Math.max(0, (prev.totalDocuments || 1) - 1),
+      verifiedRecords: rec.status === 'verified' ? Math.max(0, (prev.verifiedRecords || 1) - 1) : prev.verifiedRecords,
+    }))
+    if (activeRecord?.id === targetId) {
+      setActiveRecord(null)
+      setActiveDocUrl(null)
+    }
+
+    // 2. Call backend
+    try {
+      await api.records.delete(targetId)
+    } catch (err) {
+      console.error('Failed to delete record:', err)
+    }
+
+    // 3. Background silent sync
+    loadData(false)
+  }
+
+  const handleDeleteDocument = async (e: React.MouseEvent, doc: DocumentItem) => {
+    e.stopPropagation()
+    if (!confirm(`Delete document "${doc.originalFilename}"?`)) return
+
+    const docId = doc.id
+    const recId = doc.recordId
+
+    // 1. Instant optimistic UI update
+    setQueue(prev => prev.filter(d => d.id !== docId))
+    if (recId) {
+      setRecords(prev => prev.filter(r => r.id !== recId && r.documentId !== docId))
+    }
+    setStats(prev => ({
+      ...prev,
+      totalDocuments: Math.max(0, (prev.totalDocuments || 1) - 1),
+      totalRecords: recId ? Math.max(0, (prev.totalRecords || 1) - 1) : prev.totalRecords,
+    }))
+
+    // 2. Call backend
+    try {
+      await api.documents.delete(docId)
+    } catch (err) {
+      console.error('Failed to delete document:', err)
+    }
+
+    // 3. Background silent sync
+    loadData(false)
+  }
 
   useEffect(() => {
     loadData()
@@ -334,6 +397,9 @@ export default function OperatorDashboard() {
               <button className="dash-primary-btn" onClick={() => setSection('Upload Documents')}>
                 <Upload size={14} /> Upload Documents
               </button>
+              <button className="dash-outline-btn border-amber-500/40 text-amber-600 dark:text-amber-400" onClick={() => setSection('Mouza Maps (GIS)')}>
+                <Layers size={14} /> Mouza GIS Studio
+              </button>
               <button className="dash-outline-btn" onClick={loadData}>
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
@@ -343,14 +409,18 @@ export default function OperatorDashboard() {
           {/* Stats Bar */}
           <div className="dash-stats-row">
             {[
-              { label: 'Total Ingested', value: String(stats.totalDocuments ?? queue.length ?? 0), icon: Database, color: 'forest' },
-              { label: 'Digitized Records', value: String(stats.totalRecords ?? records.length ?? 0), icon: FileText, color: 'ochre' },
-              { label: 'Verified in DB', value: String(stats.verifiedRecords ?? records.filter(r => r.status === 'verified').length ?? 0), icon: CheckCircle2, color: 'forest' },
-              { label: 'Pending / In-Flight', value: String(stats.processingDocuments ?? 0), icon: Clock, color: 'ochre' },
+              { label: 'Total Ingested', value: String(stats.totalDocuments !== undefined ? stats.totalDocuments : queue.length), icon: Database, color: 'forest' },
+              { label: 'Digitized Records', value: String(stats.totalRecords !== undefined ? stats.totalRecords : records.length), icon: FileText, color: 'ochre' },
+              { label: 'Verified in DB', value: String(stats.verifiedRecords !== undefined ? stats.verifiedRecords : records.filter(r => r.status === 'verified').length), icon: CheckCircle2, color: 'forest' },
+              { label: 'Pending / In-Flight', value: String(stats.processingDocuments !== undefined ? stats.processingDocuments : queue.filter(d => d.status === 'processing').length), icon: Clock, color: 'ochre' },
             ].map((s) => (
               <div key={s.label} className="dash-stat-card">
                 <s.icon size={18} className={`dash-stat-icon ${s.color}`} />
-                <p className="dash-stat-value">{s.value}</p>
+                {loading ? (
+                  <Skeleton className="w-16 h-7 rounded my-1" />
+                ) : (
+                  <p className="dash-stat-value">{s.value}</p>
+                )}
                 <span className="dash-stat-label">{s.label}</span>
               </div>
             ))}
@@ -394,7 +464,9 @@ export default function OperatorDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
-                  {filteredRecords.map((rec) => (
+                  {loading ? (
+                    <SkeletonTable rows={5} cols={8} />
+                  ) : filteredRecords.map((rec) => (
                     <tr
                       key={rec.id}
                       onClick={() => openRecordInspector(rec)}
@@ -452,13 +524,7 @@ export default function OperatorDashboard() {
                             <Eye size={12} /> Inspect
                           </button>
                           <button
-                            onClick={async (e) => {
-                              e.stopPropagation()
-                              if (confirm(`Delete case for ${rec.owner || 'this record'}?`)) {
-                                await api.records.delete(rec.id)
-                                loadData()
-                              }
-                            }}
+                            onClick={(e) => handleDeleteRecord(e, rec)}
                             className="p-1.5 rounded hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors"
                             title="Delete Case"
                           >
@@ -468,7 +534,7 @@ export default function OperatorDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {filteredRecords.length === 0 && (
+                  {!loading && filteredRecords.length === 0 && (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-gray-500">
                         No digitized records found in database. Go to <strong>Upload Documents</strong> to start digitizing.
@@ -617,35 +683,59 @@ export default function OperatorDashboard() {
             <button className="dash-outline-btn" onClick={loadData}><RefreshCw size={14} /> Refresh</button>
           </div>
           <div className="dash-table">
-            {queue.map((doc) => (
-              <div key={doc.id} className="dash-table-row">
-                <div className="flex items-center gap-3">
-                  <FileText size={16} style={{ color: 'var(--ochre)' }} />
-                  <div>
-                    <span className="dash-table-primary">{doc.originalFilename}</span>
-                    <span className="dash-table-sub">
-                      ID: {doc.id.slice(0, 8)}… · Size: {((doc.fileSize || 0) / 1024).toFixed(1)} KB · District: {doc.district || 'Unassigned'}
+            {loading ? (
+              <div className="p-4 space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-3 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-5 h-5 rounded" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="w-48 h-4 rounded" />
+                        <Skeleton className="w-32 h-3 rounded" />
+                      </div>
+                    </div>
+                    <Skeleton className="w-16 h-6 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              queue.map((doc) => (
+                <div key={doc.id} className="dash-table-row">
+                  <div className="flex items-center gap-3">
+                    <FileText size={16} style={{ color: 'var(--ochre)' }} />
+                    <div>
+                      <span className="dash-table-primary">{doc.originalFilename}</span>
+                      <span className="dash-table-sub">
+                        ID: {doc.id.slice(0, 8)}… · Size: {((doc.fileSize || 0) / 1024).toFixed(1)} KB · District: {doc.district || 'Unassigned'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`dash-badge ${doc.status === 'extracted' ? 'verified' : 'pending'}`}>
+                      {doc.status}
                     </span>
+                    {doc.fileUrl && (
+                      <a
+                        href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}${doc.fileUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="dash-outline-btn py-1 px-2 text-xs inline-flex items-center gap-1"
+                      >
+                        <ExternalLink size={12} /> View File
+                      </a>
+                    )}
+                    <button
+                      onClick={(e) => handleDeleteDocument(e, doc)}
+                      className="p-1.5 rounded hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Delete Document"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`dash-badge ${doc.status === 'extracted' ? 'verified' : 'pending'}`}>
-                    {doc.status}
-                  </span>
-                  {doc.fileUrl && (
-                    <a
-                      href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}${doc.fileUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="dash-outline-btn py-1 px-2 text-xs inline-flex items-center gap-1"
-                    >
-                      <ExternalLink size={12} /> View File
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-            {queue.length === 0 && <p className="dash-card-desc p-4">No documents in queue. Go to Upload Documents to ingest deeds.</p>}
+              ))
+            )}
+            {!loading && queue.length === 0 && <p className="dash-card-desc p-4">No documents in queue. Go to Upload Documents to ingest deeds.</p>}
           </div>
         </div>
       )}
@@ -657,6 +747,11 @@ export default function OperatorDashboard() {
           <p className="dash-card-desc mb-4">Real-time breakdown of digitized land revenue records by administrative district</p>
           <DistrictProgressView />
         </div>
+      )}
+
+      {/* 5. SECTION: MOUZA MAPS (GIS) */}
+      {section === 'Mouza Maps (GIS)' && (
+        <MouzaMapStudio />
       )}
 
       {/* OCR LIVE PROCESSING MODAL */}

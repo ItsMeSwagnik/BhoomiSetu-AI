@@ -5,6 +5,8 @@ import DashboardShell from '@/components/dashboard-shell'
 import { BarChart3, CheckCircle2, Eye, Shield, ShieldCheck } from 'lucide-react'
 import { api, AuditEntry } from '@/lib/api'
 
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+
 export default function AuditorDashboard() {
   const [section, setSection] = useState('Overview')
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
@@ -62,14 +64,22 @@ export default function AuditorDashboard() {
             ].map((s) => (
               <div key={s.label} className="dash-stat-card">
                 <s.icon size={18} className={`dash-stat-icon ${s.color}`} />
-                <p className="dash-stat-value">{s.value}</p>
+                {loading ? (
+                  <Skeleton className="w-16 h-7 rounded my-1" />
+                ) : (
+                  <p className="dash-stat-value">{s.value}</p>
+                )}
                 <span className="dash-stat-label">{s.label}</span>
               </div>
             ))}
           </div>
           <div className="dash-card">
             <h2 className="dash-card-title"><Shield size={15} /> Recent Audit Entries</h2>
-            {loading ? <p className="dash-card-desc" style={{ padding: 12 }}>Loading…</p> : (
+            {loading ? (
+              <div className="p-3">
+                <SkeletonList count={4} />
+              </div>
+            ) : (
               <div className="dash-table">
                 {auditLog.slice(0, 5).map((entry) => (
                   <div key={entry.id} className="dash-table-row">

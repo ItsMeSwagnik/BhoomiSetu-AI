@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -255,7 +256,19 @@ async def reprocess_document(doc_id: str, db: Session = Depends(get_db)):
     record.ocr_model_used = extracted_data.get("ocr_model_used", "groq-vision")
     record.status = "extracted"
 
-    doc.status = "extracted"
-    db.commit()
-
     return {"success": True, "recordId": record.id}
+
+
+@router.delete("/{doc_id}")
+def delete_document(doc_id: str, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    records = db.query(LandRecord).filter(LandRecord.document_id == doc.id).all()
+    for r in records:
+        db.delete(r)
+
+    db.delete(doc)
+    db.commit()
+    return {"success": True, "message": "Document and associated records deleted"}

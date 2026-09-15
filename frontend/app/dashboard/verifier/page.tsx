@@ -24,6 +24,7 @@ import {
 import { api } from '@/lib/api'
 import type { LandRecord, FieldCorrection, ValidationScorecard, FieldVerification } from '@/lib/api-types'
 import PdfViewer from '@/components/pdf-viewer'
+import { Skeleton, SkeletonTable } from '@/components/ui/skeleton'
 
 const REVENUE_FIELD_LABELS: Record<string, string> = {
   owner: 'Primary Owner / Transferee',
@@ -221,22 +222,38 @@ export default function VerifierDashboard() {
           <div className="dash-stats-row">
             <div className="dash-stat-card">
               <Eye size={18} className="dash-stat-icon ochre" />
-              <p className="dash-stat-value">{queue.length}</p>
+              {loading ? (
+                <Skeleton className="w-16 h-7 rounded my-1" />
+              ) : (
+                <p className="dash-stat-value">{queue.length}</p>
+              )}
               <span className="dash-stat-label">Total in Queue</span>
             </div>
             <div className="dash-stat-card">
               <ShieldCheck size={18} className="dash-stat-icon forest" />
-              <p className="dash-stat-value text-emerald-600">{validatedTrueCount}</p>
+              {loading ? (
+                <Skeleton className="w-16 h-7 rounded my-1" />
+              ) : (
+                <p className="dash-stat-value text-emerald-600">{validatedTrueCount}</p>
+              )}
               <span className="dash-stat-label">PDF Validated (True)</span>
             </div>
             <div className="dash-stat-card">
               <ShieldAlert size={18} className="dash-stat-icon red" />
-              <p className="dash-stat-value text-amber-500">{validatedFalseCount}</p>
+              {loading ? (
+                <Skeleton className="w-16 h-7 rounded my-1" />
+              ) : (
+                <p className="dash-stat-value text-amber-500">{validatedFalseCount}</p>
+              )}
               <span className="dash-stat-label">Discrepancy / Unvalidated (False)</span>
             </div>
             <div className="dash-stat-card">
               <CheckCircle2 size={18} className="dash-stat-icon forest" />
-              <p className="dash-stat-value">{stats.verifiedToday || queue.filter((r) => r.status === 'verified').length}</p>
+              {loading ? (
+                <Skeleton className="w-16 h-7 rounded my-1" />
+              ) : (
+                <p className="dash-stat-value">{stats.verifiedToday || queue.filter((r) => r.status === 'verified').length}</p>
+              )}
               <span className="dash-stat-label">Verified Today</span>
             </div>
           </div>
@@ -284,17 +301,6 @@ export default function VerifierDashboard() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="text-center py-10 text-gray-400">
-                <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-emerald-500" />
-                <p className="text-xs">Loading verifier records...</p>
-              </div>
-            ) : filteredQueue.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No records match the selected filter.</p>
-              </div>
-            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -310,7 +316,17 @@ export default function VerifierDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {filteredQueue.map((r) => {
+                    {loading ? (
+                      <SkeletonTable rows={5} cols={8} />
+                    ) : filteredQueue.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-10 text-gray-500">
+                          <FileText size={32} className="mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">No records match the selected filter.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredQueue.map((r) => {
                       const scorecard = r.validationScorecard
                       const hasDiscrepancies = scorecard?.discrepancies && scorecard.discrepancies.length > 0
                       const fidelity = scorecard?.overallFidelityScore
@@ -394,11 +410,11 @@ export default function VerifierDashboard() {
                           </td>
                         </tr>
                       )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -683,7 +699,7 @@ export default function VerifierDashboard() {
                   <div className="px-3.5 py-2.5 bg-gray-950 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2 text-xs">
                     <div className="flex items-center gap-2 font-semibold text-gray-200">
                       <FileText size={14} className="text-amber-400" />
-                      <span>Original Deed PDF (Firebase / Storage)</span>
+                      <span>Original Deed PDF (Cloudinary Storage)</span>
                     </div>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       Ground-Truth Source

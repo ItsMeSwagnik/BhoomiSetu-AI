@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -23,7 +24,7 @@ async def upload_document(
         if not contents:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-        # 1. Save file to storage / firestore
+        # 1. Save file to storage / Cloudinary
         file_id, local_path, default_file_url = storage_service.save_file(contents, file.filename)
         effective_file_url = cloud_url or default_file_url
 
@@ -273,3 +274,18 @@ async def reprocess_document(doc_id: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"success": True, "recordId": record.id, "isValidated": record.is_validated}
+
+
+@router.delete("/{doc_id}")
+def delete_document(doc_id: str, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    records = db.query(LandRecord).filter(LandRecord.document_id == doc.id).all()
+    for r in records:
+        db.delete(r)
+
+    db.delete(doc)
+    db.commit()
+    return {"success": True, "message": "Document and associated records deleted"}

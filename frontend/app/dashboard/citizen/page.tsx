@@ -5,6 +5,8 @@ import DashboardShell from '@/components/dashboard-shell'
 import { AlertTriangle, CheckCircle2, Clock, FileSearch, MapPin, Plus, Search, X } from 'lucide-react'
 import { api, LandRecord, Submission } from '@/lib/api'
 
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+
 export default function CitizenDashboard() {
   const [section, setSection] = useState('Overview')
   const [searchQuery, setSearchQuery] = useState('')
@@ -93,7 +95,11 @@ export default function CitizenDashboard() {
             ].map((s) => (
               <div key={s.label} className="dash-stat-card">
                 <s.icon size={18} className={`dash-stat-icon ${s.color}`} />
-                <p className="dash-stat-value">{s.value}</p>
+                {loading ? (
+                  <Skeleton className="w-16 h-7 rounded my-1" />
+                ) : (
+                  <p className="dash-stat-value">{s.value}</p>
+                )}
                 <span className="dash-stat-label">{s.label}</span>
               </div>
             ))}
@@ -101,7 +107,11 @@ export default function CitizenDashboard() {
           <div className="dash-grid-2">
             <div className="dash-card">
               <h2 className="dash-card-title"><MapPin size={15} /> My Parcels</h2>
-              {loading ? <p className="dash-card-desc">Loading…</p> : (
+              {loading ? (
+                <div className="p-2">
+                  <SkeletonList count={3} />
+                </div>
+              ) : (
                 <div className="dash-table">
                   {myRecords.length === 0 && <p className="dash-card-desc" style={{ padding: 12 }}>No verified records found.</p>}
                   {myRecords.map((p) => (

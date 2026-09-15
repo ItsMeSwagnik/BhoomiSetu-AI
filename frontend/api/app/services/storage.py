@@ -126,7 +126,7 @@ class StorageService:
 
     @staticmethod
     def get_file_bytes(
-        file_path: str,
+        file_path: Optional[str] = None,
         file_id: Optional[str] = None,
         file_url: Optional[str] = None,
     ) -> Optional[bytes]:
@@ -134,23 +134,43 @@ class StorageService:
         Retrieves file bytes from local disk, or dynamically downloads from Cloudinary CDN
         if running in a stateless serverless environment where local disk was cleared.
         """
-        path = Path(file_path)
-        filename = path.name
+        # 1. Direct path check
+        if file_path:
+            p = Path(file_path)
+            candidates = [
+                p,
+                STORAGE_DIR / p.name,
+                Path("storage/documents") / p.name,
+                Path("/tmp/storage/documents") / p.name,
+            ]
+            for cand in candidates:
+                if cand.exists() and cand.is_file():
+                    try:
+                        with open(cand, "rb") as f:
+                            return f.read()
+                    except Exception as read_err:
+                        print(f"[Storage] Error reading {cand}: {read_err}")
 
-        candidates = [
-            path,
-            STORAGE_DIR / filename,
-            Path("storage/documents") / filename,
-            Path("/tmp/storage/documents") / filename,
-        ]
+        # 2. File ID check with known extensions
+        if file_id:
+            for ext in [".png", ".pdf", ".jpg", ".jpeg", ".tiff", ".webp", ""]:
+                cand = STORAGE_DIR / f"{file_id}{ext}"
+                if cand.exists() and cand.is_file():
+                    try:
+                        with open(cand, "rb") as f:
+                            return f.read()
+                    except Exception as read_err:
+                        print(f"[Storage] Error reading {cand}: {read_err}")
 
-        for p in candidates:
-            if p.exists() and p.is_file():
-                try:
-                    with open(p, "rb") as f:
-                        return f.read()
-                except Exception as read_err:
-                    print(f"[Storage] Error reading local file {p}: {read_err}")
+            # Glob search for any matching file_id prefix in STORAGE_DIR
+            try:
+                matches = list(STORAGE_DIR.glob(f"{file_id}*"))
+                for cand in matches:
+                    if cand.is_file():
+                        with open(cand, "rb") as f:
+                            return f.read()
+            except Exception:
+                pass
 
         # Fallback: Download from Cloudinary URL if available
         try:

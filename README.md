@@ -12,20 +12,19 @@ AI-powered land record intelligence for accountable digital public service. Bhoo
 - **Styling:** Tailwind CSS v4 + custom CSS design tokens
 - **Icons:** Lucide React
 - **Fonts:** DM Sans + Source Serif 4 (Google Fonts)
-- **Auth:** Firebase Authentication (client-side)
+- **Session:** Unified Role-Based Auth Session
 - **Package Manager:** pnpm
 
 ### Backend
 - **Framework:** FastAPI (Python)
 - **Database:** PostgreSQL + PostGIS (Neon serverless or local)
 - **ORM:** SQLAlchemy 2.x + Alembic
-- **Auth:** Firebase Admin SDK (token verification + RBAC)
-- **OCR:** PaddleOCR (primary) / MockOCREngine (dev)
+- **OCR / Vision:** Groq Vision / PaddleOCR
 - **NLP:** spaCy + regex + rule-based extraction
 - **Entity Matching:** RapidFuzz
 - **GIS:** PostGIS, GeoPandas, Shapely
 - **Background Jobs:** Celery + Redis
-- **Storage:** Local filesystem (dev) / S3-compatible (prod)
+- **Storage:** Cloudinary CDN + Local filesystem fallback
 
 ---
 
@@ -177,7 +176,7 @@ All roles use the password `BhoomiSetu@2026`.
 | Auditor | `vigilance.auditor@cag.gov.in` |
 | Admin | `sysadmin@bhoomisetu.gov.in` |
 
-> **Dev mode:** Leave `FIREBASE_SERVICE_ACCOUNT_JSON` blank in `backend/.env` and Firebase keys blank in `frontend/.env.local`. The backend accepts dev tokens and the frontend falls back to demo mode automatically.
+> **Storage & Database:** Configured for high-speed Cloudinary CDN document hosting and Neon PostgreSQL database.
 
 ---
 
@@ -262,7 +261,7 @@ Design tokens defined as CSS custom properties in `frontend/app/globals.css`:
 - **Role-specific dashboards** — all 6 roles wired to real API data, zero hardcoded values
 - **GIS / cadastral map** — parcels stored with WKT geometry, area comparison via PostGIS
 - **Dark / Light theme** — persisted in localStorage, respects system preference
-- **Firebase Auth** — client-side login/register; backend verifies tokens via Admin SDK
+- **Document Storage** — Cloudinary Secure CDN with dynamic caching & local fallback
 
 ---
 

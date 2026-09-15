@@ -2,14 +2,16 @@ import {
   UserProfile, DocumentItem, LandRecord, Parcel, AuditEntry,
   SystemLog, Submission, AppNotification, FieldCorrection, ValidationResult, ExtractedField,
   FieldVerification, ValidationScorecard,
-  LAND_CLASSIFICATION_OPTIONS, LandClassificationOption
+  LAND_CLASSIFICATION_OPTIONS, LandClassificationOption,
+  CadastralMapItem, MapPlotItem, LinkedDalilSummary
 } from './api-types'
 
 export type {
   UserProfile, DocumentItem, LandRecord, Parcel, AuditEntry,
   SystemLog, Submission, AppNotification, FieldCorrection, ValidationResult, ExtractedField,
   FieldVerification, ValidationScorecard,
-  LandClassificationOption
+  LandClassificationOption,
+  CadastralMapItem, MapPlotItem, LinkedDalilSummary
 }
 export { LAND_CLASSIFICATION_OPTIONS }
 
@@ -39,7 +41,7 @@ async function tryFetch<T>(url: string, options?: RequestInit, fallbackData?: T)
 }
 
 const mockUser: UserProfile = {
-  id: 'u1', firebaseUid: 'f1', name: 'Authorized User', email: 'user@bhoomisetu.gov.in',
+  id: 'u1', name: 'Authorized User', email: 'user@bhoomisetu.gov.in',
   role: 'operator', status: 'active', createdAt: new Date().toISOString()
 }
 
@@ -125,6 +127,9 @@ export const api = {
     },
     reprocess: async (id: string) => {
       return tryFetch(`/api/documents/${id}/reprocess`, { method: 'POST' })
+    },
+    delete: async (id: string) => {
+      return tryFetch<{ success: boolean }>(`/api/documents/${id}`, { method: 'DELETE' })
     },
   },
 
@@ -247,5 +252,78 @@ export const api = {
     list: async () => [] as AppNotification[],
     markRead: async (id?: string) => {},
     markAllRead: async () => {},
+  },
+
+  cadastralMaps: {
+    list: async (params?: { state?: string; district?: string; mouza_name?: string; skip?: number; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.state) query.set('state', params.state)
+      if (params?.district) query.set('district', params.district)
+      if (params?.mouza_name) query.set('mouza_name', params.mouza_name)
+      if (params?.skip !== undefined) query.set('skip', params.skip.toString())
+      if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+      const qs = query.toString() ? `?${query.toString()}` : ''
+      return tryFetch<CadastralMapItem[]>(`/api/cadastral-maps${qs}`, {}, [])
+    },
+    get: async (id: string) => {
+      return tryFetch<CadastralMapItem>(`/api/cadastral-maps/${id}`)
+    },
+    upload: async (file: File, metadata: { state: string; district: string; mouza_name: string; mouza_no?: string }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('state', metadata.state)
+      formData.append('district', metadata.district)
+      formData.append('mouza_name', metadata.mouza_name)
+      if (metadata.mouza_no) {
+        formData.append('mouza_no', metadata.mouza_no)
+      }
+
+      const res = await fetch(`${API_BASE}/api/cadastral-maps/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText || 'Upload failed')
+      }
+      return await res.json()
+    },
+    reprocess: async (id: string) => {
+      return tryFetch<CadastralMapItem>(`/api/cadastral-maps/${id}/reprocess`, { method: 'POST' })
+    },
+    delete: async (id: string) => {
+      return tryFetch<{ success: boolean }>(`/api/cadastral-maps/${id}`, { method: 'DELETE' })
+    },
+    createPlot: async (mapId: string, plot: { plot_number?: string; polygon_coordinates: [number, number][] }) => {
+      return tryFetch<MapPlotItem>(`/api/cadastral-maps/${mapId}/plots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(plot),
+      })
+    },
+    patchPlot: async (mapId: string, plotId: string, data: { plot_number?: string; polygon_coordinates?: [number, number][]; status?: string }) => {
+      return tryFetch<MapPlotItem>(`/api/cadastral-maps/${mapId}/plots/${plotId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    },
+    deletePlot: async (mapId: string, plotId: string) => {
+      return tryFetch<{ success: boolean }>(`/api/cadastral-maps/${mapId}/plots/${plotId}`, {
+        method: 'DELETE',
+      })
+    },
+    assignPlot: async (mapId: string, plotId: string, dalilId: string) => {
+      return tryFetch<MapPlotItem>(`/api/cadastral-maps/${mapId}/plots/${plotId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dalil_id: dalilId }),
+      })
+    },
+    unassignPlot: async (mapId: string, plotId: string) => {
+      return tryFetch<MapPlotItem>(`/api/cadastral-maps/${mapId}/plots/${plotId}/unassign`, {
+        method: 'POST',
+      })
+    },
   },
 }

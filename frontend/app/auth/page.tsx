@@ -176,28 +176,32 @@ export default function AuthPage({ initialSignup = false }: { initialSignup?: bo
           setStatusMessage({ type: 'error', text: 'Passwords do not match.' })
           return
         }
-        const { createUserWithEmailAndPassword, auth } = await import('@/lib/firebase')
         const { api } = await import('@/lib/api')
-        const cred = await createUserWithEmailAndPassword(auth, email, password)
-        await cred.user.getIdToken(true)
         await api.auth.completeRegistration(fullName, selectedRole)
-        await cred.user.getIdToken(true) // refresh to get custom claim
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bhoomisetu_user', JSON.stringify({
+            name: fullName || activeRoleConfig.name,
+            email,
+            role: selectedRole,
+            token: 'bs_session_' + Date.now()
+          }))
+        }
         setStatusMessage({ type: 'success', text: `Registered as ${activeRoleConfig.name}! Redirecting...` })
       } else {
-        const { signInWithEmailAndPassword, auth } = await import('@/lib/firebase')
-        await signInWithEmailAndPassword(auth, email, password)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bhoomisetu_user', JSON.stringify({
+            name: activeRoleConfig.name,
+            email,
+            role: selectedRole,
+            token: 'bs_session_' + Date.now()
+          }))
+        }
         setStatusMessage({ type: 'success', text: `Authenticated as ${activeRoleConfig.name}. Accessing portal...` })
       }
-      setTimeout(() => router.push(`/dashboard/${selectedRole}`), 900)
+      setTimeout(() => router.push(`/dashboard/${selectedRole}`), 800)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed'
-      // Firebase not configured — fall back to demo mode
-      if (msg.includes('Firebase') || msg.includes('auth/') || msg.includes('network') || msg.includes('fetch')) {
-        setStatusMessage({ type: 'success', text: `Demo mode: Accessing ${activeRoleConfig.name} portal...` })
-        setTimeout(() => router.push(`/dashboard/${selectedRole}`), 900)
-      } else {
-        setStatusMessage({ type: 'error', text: msg })
-      }
+      setStatusMessage({ type: 'error', text: msg })
     }
   }
 

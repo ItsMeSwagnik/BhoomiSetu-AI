@@ -5,6 +5,8 @@ import DashboardShell from '@/components/dashboard-shell'
 import { AlertTriangle, CheckCircle2, FileCheck2, Map, MapPin, UserCheck } from 'lucide-react'
 import { api, LandRecord, Parcel } from '@/lib/api'
 
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+
 export default function OfficerDashboard() {
   const [section, setSection] = useState('Overview')
   const [queue, setQueue] = useState<LandRecord[]>([])
@@ -78,14 +80,22 @@ export default function OfficerDashboard() {
             ].map((s) => (
               <div key={s.label} className="dash-stat-card">
                 <s.icon size={18} className={`dash-stat-icon ${s.color}`} />
-                <p className="dash-stat-value">{s.value}</p>
+                {loading ? (
+                  <Skeleton className="w-16 h-7 rounded my-1" />
+                ) : (
+                  <p className="dash-stat-value">{s.value}</p>
+                )}
                 <span className="dash-stat-label">{s.label}</span>
               </div>
             ))}
           </div>
           <div className="dash-card">
             <h2 className="dash-card-title"><AlertTriangle size={15} /> Pending Approval</h2>
-            {loading ? <p className="dash-card-desc" style={{ padding: 12 }}>Loading…</p> : (
+            {loading ? (
+              <div className="p-3">
+                <SkeletonList count={3} />
+              </div>
+            ) : (
               <div className="dash-table">
                 {queue.slice(0, 4).map((rec) => (
                   <div key={rec.id} className="dash-table-row">
