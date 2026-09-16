@@ -35,21 +35,9 @@ def init_cloudinary() -> bool:
         import cloudinary.api
 
         c_url = getattr(settings, "cloudinary_url", None) or os.getenv("CLOUDINARY_URL")
-        cloud_name = (
-            getattr(settings, "cloudinary_cloud_name", None)
-            or os.getenv("CLOUDINARY_CLOUD_NAME")
-            or "dgz0zrojz"
-        )
-        api_key = (
-            getattr(settings, "cloudinary_api_key", None)
-            or os.getenv("CLOUDINARY_API_KEY")
-            or "782446436321221"
-        )
-        api_secret = (
-            getattr(settings, "cloudinary_api_secret", None)
-            or os.getenv("CLOUDINARY_API_SECRET")
-            or "q5G_FUBhrYVEcdJADvEf2UBJpLI"
-        )
+        cloud_name = getattr(settings, "cloudinary_cloud_name", None) or os.getenv("CLOUDINARY_CLOUD_NAME")
+        api_key = getattr(settings, "cloudinary_api_key", None) or os.getenv("CLOUDINARY_API_KEY")
+        api_secret = getattr(settings, "cloudinary_api_secret", None) or os.getenv("CLOUDINARY_API_SECRET")
 
         if c_url:
             os.environ["CLOUDINARY_URL"] = c_url
@@ -64,6 +52,9 @@ def init_cloudinary() -> bool:
                     cloud_name = parsed.hostname
             except Exception:
                 pass
+
+        if not cloud_name or not api_key or not api_secret:
+            return False
 
         cloudinary.config(
             cloud_name=cloud_name,
@@ -178,12 +169,8 @@ class StorageService:
             if file_url and (file_url.startswith("http://") or file_url.startswith("https://")):
                 target_url = file_url
             elif init_cloudinary():
-                cloud_name = (
-                    getattr(settings, "cloudinary_cloud_name", None)
-                    or os.getenv("CLOUDINARY_CLOUD_NAME")
-                    or "dgz0zrojz"
-                )
-                if file_id:
+                cloud_name = getattr(settings, "cloudinary_cloud_name", None) or os.getenv("CLOUDINARY_CLOUD_NAME")
+                if file_id and cloud_name:
                     clean_name = path.stem.replace(" ", "_")
                     target_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/bhoomisetu_documents/{file_id}_{clean_name}{path.suffix}"
 
@@ -208,11 +195,7 @@ class StorageService:
         """Diagnostic function for checking storage health."""
         c_ready = init_cloudinary()
         local_writable = os.access(str(STORAGE_DIR), os.W_OK)
-        cloud_name = (
-            getattr(settings, "cloudinary_cloud_name", None)
-            or os.getenv("CLOUDINARY_CLOUD_NAME")
-            or "dgz0zrojz"
-        )
+        cloud_name = getattr(settings, "cloudinary_cloud_name", None) or os.getenv("CLOUDINARY_CLOUD_NAME")
         return {
             "local_storage": {
                 "path": str(STORAGE_DIR.resolve()),
