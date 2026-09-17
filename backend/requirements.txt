@@ -16,7 +16,7 @@ rapidfuzz>=3.11.0
 shapely==2.0.6
 geoalchemy2==0.17.0
 geopandas>=0.14.0
-pytesseract>=0.3.13
+# Cloud-native & Serverless optimized
 python-dotenv==1.0.1
 httpx==0.28.1
 cloudinary>=1.41.0

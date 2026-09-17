@@ -206,6 +206,7 @@ function getDashboardLinks(role: UserRole) {
     citizen: [
       { label: 'Overview', icon: BarChart3 },
       { label: 'My Parcels', icon: MapPin },
+      { label: 'Cadastral Map', icon: Map },
       { label: 'Track Requests', icon: Clock },
       { label: 'Public Records', icon: FileSearch },
     ],

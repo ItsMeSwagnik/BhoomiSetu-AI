@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -47,10 +48,10 @@ export const LIFECYCLE_STEPS: LifecycleStep[] = [
   },
   {
     step: 3,
-    title: 'Multilingual OCR & TrOCR',
-    subtitle: 'Printed & handwritten Hindi, Bengali, English extraction',
+    title: 'Multimodal Vision & HTR',
+    subtitle: 'Printed & handwritten Indic extraction via Groq Llama 3.2 Vision',
     icon: FileSearch,
-    tag: 'OCR & Handwriting',
+    tag: 'Vision & Handwriting',
   },
   {
     step: 4,
@@ -184,7 +185,7 @@ export default function ParcelLifecycle() {
                       : 'text-stone-500 hover:text-stone-900 dark:text-stone-400'
                   }`}
                 >
-                  <span>{isDone ? '✓' : s.step}</span>
+                  <span>{isDone ? <Check size={12} className="inline" /> : s.step}</span>
                   <span className="hidden md:inline">{s.title}</span>
                 </button>
               )
@@ -399,8 +400,9 @@ export default function ParcelLifecycle() {
                   <p className="text-base font-bold text-amber-900 dark:text-amber-200 mt-1">
                     2.45 acres
                   </p>
-                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-300 font-mono">
-                    Confidence: 63% ⚠️ (Ink Bleed)
+                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-300 font-mono flex items-center gap-1">
+                    <AlertTriangle size={12} className="inline text-amber-600" />
+                    Confidence: 63% (Ink Bleed Discrepancy)
                   </div>
                 </div>
               </div>
@@ -483,8 +485,9 @@ export default function ParcelLifecycle() {
                   <span className="text-[10px] text-amber-800 dark:text-amber-300 uppercase font-bold">
                     Variance
                   </span>
-                  <p className="text-xl font-bold text-amber-800 dark:text-amber-300 mt-1">
-                    +5.3% ⚠️
+                  <p className="text-xl font-bold text-amber-800 dark:text-amber-300 mt-1 flex items-center gap-1.5">
+                    +5.3%
+                    <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
                   </p>
                 </div>
               </div>
@@ -592,9 +595,16 @@ export default function ParcelLifecycle() {
               <button
                 type="button"
                 onClick={() => setIsCorrected(true)}
-                className="terra-pill dark"
+                className="terra-pill dark flex items-center gap-2 mx-auto"
               >
-                {isCorrected ? '✓ Adjudication Saved' : 'Accept 2.58 Acres & Sign'}
+                {isCorrected ? (
+                  <>
+                    <CheckCircle2 size={15} className="text-emerald-400" />
+                    <span>Adjudication Saved</span>
+                  </>
+                ) : (
+                  'Accept 2.58 Acres & Sign'
+                )}
               </button>
             </div>
           )}

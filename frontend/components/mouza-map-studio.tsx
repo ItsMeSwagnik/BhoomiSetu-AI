@@ -23,6 +23,7 @@ import {
   Plus,
   Loader2,
   FolderOpen,
+  ShieldCheck,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { CadastralMapItem, MapPlotItem, LandRecord } from '@/lib/api-types'
@@ -31,7 +32,12 @@ import { Skeleton, SkeletonTable } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
-export function MouzaMapStudio() {
+interface MouzaMapStudioProps {
+  readOnly?: boolean
+  role?: string
+}
+
+export function MouzaMapStudio({ readOnly = false, role = 'operator' }: MouzaMapStudioProps) {
   const [maps, setMaps] = useState<CadastralMapItem[]>([])
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
   const [selectedMap, setSelectedMap] = useState<CadastralMapItem | null>(null)
@@ -72,15 +78,15 @@ export function MouzaMapStudio() {
     try {
       const data = await api.cadastralMaps.list()
       setMaps(data)
-      if (selectFirst && data.length > 0 && !selectedMapId) {
-        setSelectedMapId(data[0].id)
+      if (selectFirst && data.length > 0) {
+        setSelectedMapId((prev) => prev || data[0].id)
       }
     } catch (err) {
       console.error('Failed to load cadastral maps', err)
     } finally {
       setLoading(false)
     }
-  }, [selectedMapId])
+  }, [])
 
   // 2. Fetch selected map details with plots
   const loadMapDetail = useCallback(async (mapId: string) => {
@@ -88,35 +94,37 @@ export function MouzaMapStudio() {
     try {
       const detail = await api.cadastralMaps.get(mapId)
       setSelectedMap(detail)
-      // Reset or update selected plot
-      if (selectedPlot) {
-        const updated = detail.plots?.find((p) => p.id === selectedPlot.id) || null
-        setSelectedPlot(updated)
-      }
+      // Update selected plot without causing dependency thrashing
+      setSelectedPlot((prev) => {
+        if (!prev) return null
+        return detail.plots?.find((p) => p.id === prev.id) || null
+      })
     } catch (err) {
       console.error('Failed to load map detail', err)
     } finally {
       setMapDetailLoading(false)
     }
-  }, [selectedPlot])
+  }, [])
 
   // 3. Fetch Dalil records for linking
-  const loadDalilRecords = useCallback(async (district?: string) => {
+  const loadDalilRecords = useCallback(async (district?: string, query?: string) => {
     setLoadingDalils(true)
     try {
-      const records = await api.records.list({ district: district || undefined, q: dalilSearchQuery || undefined })
+      const records = await api.records.list({ district: district || undefined, q: query || undefined })
       setAvailableDalils(records)
     } catch (err) {
       console.error('Failed to load dalil records', err)
     } finally {
       setLoadingDalils(false)
     }
-  }, [dalilSearchQuery])
+  }, [])
 
+  // Initial load on mount
   useEffect(() => {
     loadMaps(true)
   }, [loadMaps])
 
+  // Fetch map details only when selectedMapId changes
   useEffect(() => {
     if (selectedMapId) {
       loadMapDetail(selectedMapId)
@@ -126,12 +134,13 @@ export function MouzaMapStudio() {
     }
   }, [selectedMapId, loadMapDetail])
 
+  // Load dalil records when selected plot or search query changes
   useEffect(() => {
     if (selectedPlot) {
       setEditingPlotNumber(selectedPlot.plotNumber || '')
-      loadDalilRecords(selectedMap?.district)
+      loadDalilRecords(selectedMap?.district, dalilSearchQuery)
     }
-  }, [selectedPlot, selectedMap?.district, loadDalilRecords])
+  }, [selectedPlot?.id, selectedMap?.district, dalilSearchQuery, loadDalilRecords])
 
   // Handle map upload & pipeline
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -321,19 +330,26 @@ export function MouzaMapStudio() {
       <div className="dash-page-header">
         <div>
           <h1 className="dash-page-title flex items-center gap-2">
-            <Layers className="text-amber-500" size={24} /> Cadastral Mouza Map Studio
+            <Layers className="text-amber-500" size={24} /> Mouza Cadastral GIS & Parcel Studio
           </h1>
           <p className="dash-page-sub">
-            Upload Mouza survey sheets, auto-extract parcel boundaries via OpenCV contours + OCR, adjust geometries, and link plots to Dalil deeds.
+            Interactive cadastral survey sheet vectorizer, boundary geometry editor, and plot-to-Dalil deed assignment system.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            onClick={() => setShowUploadModal(true)}
-            className="dash-primary-btn text-xs py-2 px-4 shadow-lg shadow-amber-900/20"
-          >
-            <Upload size={14} className="mr-1.5" /> Upload Mouza Sheet
-          </Button>
+          {!readOnly ? (
+            <Button
+              onClick={() => setShowUploadModal(true)}
+              className="dash-primary-btn text-xs py-2 px-4 shadow-lg shadow-amber-900/20"
+            >
+              <Upload size={14} className="mr-1.5" /> Upload Survey Sheet
+            </Button>
+          ) : (
+            <span className="text-xs px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 border border-stone-700 font-semibold flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-emerald-500" />
+              {role === 'officer' ? 'Officer Adjudication View (Read-Only)' : 'Verifier Review Mode (Read-Only)'}
+            </span>
+          )}
           <Button
             variant="outline"
             onClick={() => loadMaps()}
@@ -405,16 +421,18 @@ export function MouzaMapStudio() {
                             {m.district}, {m.state}
                           </div>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteMap(m.id)
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 transition-opacity"
-                          title="Delete Sheet"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteMap(m.id)
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 transition-opacity"
+                            title="Delete Sheet"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-200/50 dark:border-gray-800/50 text-[10px]">
@@ -462,6 +480,7 @@ export function MouzaMapStudio() {
                   onReprocessClick={handleReprocess}
                   isReprocessing={isReprocessing}
                   onSaveVertices={handleSaveVertices}
+                  readOnly={readOnly}
                 />
               </div>
 
@@ -495,27 +514,36 @@ export function MouzaMapStudio() {
                       </Badge>
                     </div>
 
-                    {/* Editable Plot Number */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-gray-500">Edit Plot Number</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={editingPlotNumber}
-                          onChange={(e) => setEditingPlotNumber(e.target.value)}
-                          placeholder="e.g. 248/A"
-                          className="flex-1 text-xs p-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent font-mono"
-                        />
-                        <Button
-                          size="sm"
-                          disabled={isSavingPlotNumber || editingPlotNumber === selectedPlot.plotNumber}
-                          onClick={handleSavePlotNumber}
-                          className="h-8 text-xs bg-amber-600 hover:bg-amber-500 text-white"
-                        >
-                          {isSavingPlotNumber ? <Loader2 size={12} className="animate-spin" /> : <Check size={13} />}
-                        </Button>
+                    {/* Editable Plot Number (Operator Only) */}
+                    {!readOnly ? (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-500">Edit Plot Number</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editingPlotNumber}
+                            onChange={(e) => setEditingPlotNumber(e.target.value)}
+                            placeholder="e.g. 248/A"
+                            className="flex-1 text-xs p-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent font-mono"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={isSavingPlotNumber || editingPlotNumber === selectedPlot.plotNumber}
+                            onClick={handleSavePlotNumber}
+                            className="h-8 text-xs bg-amber-600 hover:bg-amber-500 text-white"
+                          >
+                            {isSavingPlotNumber ? <Loader2 size={12} className="animate-spin" /> : <Check size={13} />}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-gray-500 font-semibold uppercase">Cadastral Survey Code</span>
+                        <p className="text-xs font-mono font-bold text-white bg-black/10 dark:bg-white/5 p-2 rounded-lg border border-gray-200/50 dark:border-gray-800/50">
+                          Plot #{selectedPlot.plotNumber || 'Unassigned'} · Mouza {selectedMap.mouzaName}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Spatial Geometry Info */}
                     <div className="p-3 rounded-lg bg-black/5 dark:bg-white/5 space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
@@ -563,17 +591,19 @@ export function MouzaMapStudio() {
                                 {selectedPlot.linkedDalil.mouza || selectedMap.mouzaName}, {selectedPlot.linkedDalil.district}
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUnassignDalil(selectedPlot)}
-                              className="h-7 text-[11px] text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
-                            >
-                              <Unlink size={12} className="mr-1" /> Unlink
-                            </Button>
+                            {!readOnly && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUnassignDalil(selectedPlot)}
+                                className="h-7 text-[11px] text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
+                              >
+                                <Unlink size={12} className="mr-1" /> Unlink
+                              </Button>
+                            )}
                           </div>
                         </div>
-                      ) : (
+                      ) : !readOnly ? (
                         <div className="space-y-3">
                           <p className="text-[11px] text-gray-500">
                             Search digitized Dalil deed records in {selectedMap.district} to assign to Plot #{selectedPlot.plotNumber}:
@@ -628,8 +658,20 @@ export function MouzaMapStudio() {
                             )}
                           </div>
                         </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 text-center text-xs text-stone-400 italic">
+                          No Dalil deed record linked to this cadastral parcel.
+                        </div>
                       )}
                     </div>
+
+                    {/* RBAC Role Notice */}
+                    {readOnly && (
+                      <div className="p-2.5 rounded-lg bg-stone-900/90 border border-stone-800 text-[10px] text-stone-400 flex items-center gap-1.5">
+                        <ShieldCheck size={12} className="text-emerald-500 flex-shrink-0" />
+                        <span>Review Mode: Map editing and deed assignments are restricted to Data Operators.</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="dash-card p-6 text-center space-y-3">
@@ -637,20 +679,23 @@ export function MouzaMapStudio() {
                       <Sliders size={22} />
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Select a Plot Boundary</h4>
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Select a Parcel Boundary</h4>
                       <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
                         Click on any parcel on the map to inspect properties, adjust vertices, or link with a Dalil deed.
                       </p>
                     </div>
-                    <div className="pt-3 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 space-y-1 text-left">
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 space-y-1.5 text-left">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Extracted by OpenCV
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Survey Boundary
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Linked to Dalil Deed
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Flagged / Low Confidence
+                        <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" /> Verified Parcel
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Needs Review
                       </div>
                     </div>
                   </div>
@@ -668,7 +713,7 @@ export function MouzaMapStudio() {
                 onClick={() => setShowUploadModal(true)}
                 className="mt-4 dash-primary-btn text-xs py-2 px-4"
               >
-                <Upload size={14} className="mr-1.5" /> Upload Mouza Sheet
+                <Upload size={14} className="mr-1.5" /> Upload Survey Sheet
               </Button>
             </div>
           )}
@@ -686,7 +731,7 @@ export function MouzaMapStudio() {
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-gray-900 dark:text-gray-100">Upload Cadastral Mouza Map</h3>
-                  <p className="text-xs text-gray-500">Auto-extract parcel polygons and synchronize with PostGIS</p>
+                  <p className="text-xs text-gray-500">Vectorize parcel polygons and synchronize with PostGIS</p>
                 </div>
               </div>
               <button
@@ -709,9 +754,9 @@ export function MouzaMapStudio() {
                 <Loader2 size={32} className="animate-spin text-amber-500 mx-auto" />
                 <div>
                   <h4 className="font-semibold text-sm">
-                    {uploadStage === 1 && 'Uploading high-res sheet to Cloudinary CDN...'}
-                    {uploadStage === 2 && 'Executing OpenCV contour detection & OCR on parcels...'}
-                    {uploadStage === 3 && 'Persisting canonical PostGIS WKT polygon geometries...'}
+                    {uploadStage === 1 && 'Uploading high-res sheet to storage...'}
+                    {uploadStage === 2 && 'Extracting cadastral boundary contours & plot numbers...'}
+                    {uploadStage === 3 && 'Persisting canonical PostGIS polygon geometries...'}
                   </h4>
                   <p className="text-xs text-gray-500 mt-1 font-mono">{uploadFile?.name}</p>
                 </div>
@@ -794,7 +839,7 @@ export function MouzaMapStudio() {
                     disabled={!uploadFile || !formMouzaName}
                     className="dash-primary-btn text-xs py-1.5 px-4"
                   >
-                    <Sparkles size={13} className="mr-1.5" /> Start CV Extraction
+                    <Layers size={13} className="mr-1.5" /> Digitize & Vectorize Sheet
                   </Button>
                 </div>
               </form>

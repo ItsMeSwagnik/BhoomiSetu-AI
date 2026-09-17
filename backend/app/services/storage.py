@@ -171,15 +171,21 @@ class StorageService:
             elif init_cloudinary():
                 cloud_name = getattr(settings, "cloudinary_cloud_name", None) or os.getenv("CLOUDINARY_CLOUD_NAME")
                 if file_id and cloud_name:
-                    clean_name = path.stem.replace(" ", "_")
-                    target_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/bhoomisetu_documents/{file_id}_{clean_name}{path.suffix}"
+                    p_obj = Path(file_path) if file_path else None
+                    clean_name = p_obj.stem.replace(" ", "_") if p_obj else ""
+                    suffix = p_obj.suffix if p_obj else ""
+                    if clean_name:
+                        target_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/bhoomisetu_documents/{file_id}_{clean_name}{suffix}"
+                    else:
+                        target_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/bhoomisetu_documents/{file_id}"
 
             if target_url:
                 import httpx
                 resp = httpx.get(target_url, timeout=30.0, follow_redirects=True)
                 if resp.status_code == 200 and resp.content:
                     try:
-                        local_cache = STORAGE_DIR / filename
+                        cache_name = Path(file_path).name if file_path else f"{file_id}.pdf"
+                        local_cache = STORAGE_DIR / cache_name
                         with open(local_cache, "wb") as f:
                             f.write(resp.content)
                     except Exception:

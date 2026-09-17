@@ -49,7 +49,7 @@ class LandRecord(Base):
     mouza = Column(String(255), nullable=True)
     tehsil_taluk = Column(String(255), nullable=True)
     district = Column(String(255), nullable=True)
-    land_classification = Column(JSON, default=list)  # array of strings e.g. ["🌾 Agricultural Land"]
+    land_classification = Column(JSON, default=list)  # array of strings e.g. ["Agricultural Land"]
     mutation_number = Column(String(100), nullable=True)
     mutation_date = Column(String(100), nullable=True)
     registration_number = Column(String(100), nullable=True)

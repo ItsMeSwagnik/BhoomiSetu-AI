@@ -76,6 +76,8 @@ def record_to_dict(r: LandRecord) -> Dict[str, Any]:
     }
 
 
+from sqlalchemy.orm import Session, joinedload
+
 @router.get("")
 def list_records(
     q: Optional[str] = Query(None),
@@ -84,7 +86,7 @@ def list_records(
     is_validated: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
-    query = db.query(LandRecord).order_by(LandRecord.created_at.desc())
+    query = db.query(LandRecord).options(joinedload(LandRecord.document)).order_by(LandRecord.created_at.desc())
     if district:
         query = query.filter(LandRecord.district.ilike(f"%{district}%"))
     if status:

@@ -29,7 +29,7 @@ export default function VerificationStudio() {
     'Aligned with Cadastral Map geometry and Line 4 ink annotation'
   )
   const [auditLog, setAuditLog] = useState<string[]>([
-    'System: Parsed by PaddleOCR + Indic TrOCR pipeline',
+    'System: Parsed by Groq Llama 3.2 Vision + OpenCV pipeline',
     'Anomaly: Area variance flagged for authorized officer review',
   ])
 

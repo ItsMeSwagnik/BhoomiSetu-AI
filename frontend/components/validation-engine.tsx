@@ -272,7 +272,7 @@ export default function ValidationEngine() {
                   </div>
                 ) : (
                   <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block">
-                    {entityConfirmed ? '✓ Entity Association Recorded in Audit Table' : '✓ Stored as Distinct Individuals'}
+                    {entityConfirmed ? 'Entity Association Recorded in Audit Table' : 'Stored as Distinct Individuals'}
                   </span>
                 )}
               </div>

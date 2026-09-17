@@ -2,6 +2,7 @@ import Script from 'next/script'
 import { DM_Sans, Source_Serif_4 } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { MobileWarning } from '@/components/mobile-warning'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' })
 const sourceSerif = Source_Serif_4({ subsets: ['latin'], variable: '--font-source-serif' })
@@ -36,6 +37,7 @@ export default function RootLayout({
             } catch(e) {}
           })();
         `}</Script>
+        <MobileWarning />
         {children}
       </body>
     </html>

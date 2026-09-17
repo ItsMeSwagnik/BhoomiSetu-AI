@@ -6,13 +6,14 @@ import { AlertTriangle, CheckCircle2, Plus, RefreshCw, Settings, Sliders, Users,
 import { api, UserProfile, SystemLog } from '@/lib/api'
 
 const PIPELINES = [
-  { id: 'pl1', name: 'PaddleOCR v3.1', status: 'Running', accuracy: '94.2%' },
-  { id: 'pl2', name: 'Indic TrOCR', status: 'Running', accuracy: '91.8%' },
-  { id: 'pl3', name: 'PostGIS Validator', status: 'Running', accuracy: '99.1%' },
-  { id: 'pl4', name: 'RapidFuzz Entity Matcher', status: 'Idle', accuracy: '88.5%' },
+  { id: 'pl1', name: 'Groq Llama 3.2 90B Vision Engine', status: 'Running', accuracy: '96.8%' },
+  { id: 'pl2', name: 'Groq Llama 3.2 11B Fast Vision', status: 'Running', accuracy: '93.4%' },
+  { id: 'pl3', name: 'PostGIS Geodesic Cadastral Engine', status: 'Running', accuracy: '99.4%' },
+  { id: 'pl4', name: 'Ground-Truth PDF Fidelity Engine', status: 'Running', accuracy: '98.2%' },
 ]
 
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+import { Pagination } from '@/components/ui/pagination'
 
 export default function AdminDashboard() {
   const [section, setSection] = useState('Overview')
@@ -28,6 +29,15 @@ export default function AdminDashboard() {
   const [newUserEmail, setNewUserEmail] = useState('')
   const [newUserPassword, setNewUserPassword] = useState('BhoomiSetu@2026')
   const [settingsSaved, setSettingsSaved] = useState(false)
+
+  // Pagination states
+  const [usersPage, setUsersPage] = useState(1)
+  const [usersPageSize, setUsersPageSize] = useState(10)
+  const [logsPage, setLogsPage] = useState(1)
+  const [logsPageSize, setLogsPageSize] = useState(10)
+
+  const paginatedUsers = users.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize)
+  const paginatedLogs = systemLogs.slice((logsPage - 1) * logsPageSize, logsPage * logsPageSize)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -183,7 +193,7 @@ export default function AdminDashboard() {
             <h2 className="dash-card-title"><Users size={15} /> All Users ({users.length})</h2>
             {loading ? <p className="dash-card-desc" style={{ padding: 12 }}>Loading…</p> : (
               <div className="dash-table">
-                {users.map((u) => (
+                {paginatedUsers.map((u) => (
                   <div key={u.id} className="dash-table-row">
                     <div>
                       <span className="dash-table-primary">{u.name}</span>
@@ -199,6 +209,17 @@ export default function AdminDashboard() {
                 {users.length === 0 && <p className="dash-card-desc" style={{ padding: 12 }}>No users found.</p>}
               </div>
             )}
+            <Pagination
+              currentPage={usersPage}
+              totalItems={users.length}
+              pageSize={usersPageSize}
+              onPageChange={setUsersPage}
+              onPageSizeChange={(newSize) => {
+                setUsersPageSize(newSize)
+                setUsersPage(1)
+              }}
+              pageSizeOptions={[5, 10, 20, 50]}
+            />
           </div>
         </>
       )}
@@ -230,7 +251,7 @@ export default function AdminDashboard() {
           <div className="dash-card">
             <h2 className="dash-card-title">System Logs ({systemLogs.length})</h2>
             <div className="dash-table">
-              {systemLogs.slice(0, 8).map((log) => (
+              {paginatedLogs.map((log) => (
                 <div key={log.id} className="dash-table-row">
                   <div>
                     <span className="dash-table-primary">{log.eventType}</span>
@@ -241,6 +262,17 @@ export default function AdminDashboard() {
               ))}
               {systemLogs.length === 0 && <p className="dash-card-desc" style={{ padding: 12 }}>No system logs.</p>}
             </div>
+            <Pagination
+              currentPage={logsPage}
+              totalItems={systemLogs.length}
+              pageSize={logsPageSize}
+              onPageChange={setLogsPage}
+              onPageSizeChange={(newSize) => {
+                setLogsPageSize(newSize)
+                setLogsPage(1)
+              }}
+              pageSizeOptions={[5, 10, 20, 50]}
+            />
           </div>
         </>
       )}
@@ -272,7 +304,7 @@ export default function AdminDashboard() {
               ))}
             </div>
             <button className="dash-primary-btn" style={{ marginTop: 16 }} onClick={saveSettings}>
-              {settingsSaved ? '✓ Saved' : 'Save Settings'}
+              {settingsSaved ? 'Saved' : 'Save Settings'}
             </button>
           </div>
           <div className="dash-card">

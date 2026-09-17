@@ -6,6 +6,7 @@ import { BarChart3, CheckCircle2, Eye, Shield, ShieldCheck } from 'lucide-react'
 import { api, AuditEntry } from '@/lib/api'
 
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
+import { Pagination } from '@/components/ui/pagination'
 
 export default function AuditorDashboard() {
   const [section, setSection] = useState('Overview')
@@ -13,6 +14,8 @@ export default function AuditorDashboard() {
   const [stats, setStats] = useState<Record<string, number | string>>({})
   const [districtData, setDistrictData] = useState<{ district: string; count: number }[]>([])
   const [filterType, setFilterType] = useState('All')
+  const [auditPage, setAuditPage] = useState(1)
+  const [auditPageSize, setAuditPageSize] = useState(15)
   const [note, setNote] = useState('')
   const [notes, setNotes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +40,12 @@ export default function AuditorDashboard() {
 
   const actionTypes = ['All', ...Array.from(new Set(auditLog.map(e => e.action)))]
   const filtered = filterType === 'All' ? auditLog : auditLog.filter(e => e.action === filterType)
+  const paginatedAudit = filtered.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize)
+
+  const handleFilterChange = (t: string) => {
+    setFilterType(t)
+    setAuditPage(1)
+  }
 
   const actionLabel = (action: string) => {
     const map: Record<string, string> = {
@@ -106,14 +115,14 @@ export default function AuditorDashboard() {
             <div className="flex items-center gap-3 flex-wrap">
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>Filter by action:</span>
               {actionTypes.slice(0, 7).map((t) => (
-                <button key={t} className={filterType === t ? 'dash-primary-btn' : 'dash-outline-btn'} style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => setFilterType(t)}>{t === 'All' ? 'All' : actionLabel(t)}</button>
+                <button key={t} className={filterType === t ? 'dash-primary-btn' : 'dash-outline-btn'} style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => handleFilterChange(t)}>{t === 'All' ? 'All' : actionLabel(t)}</button>
               ))}
             </div>
           </div>
           <div className="dash-card">
             <h2 className="dash-card-title"><Shield size={15} /> Audit Log ({filtered.length})</h2>
             <div className="dash-table">
-              {filtered.map((entry) => (
+              {paginatedAudit.map((entry) => (
                 <div key={entry.id} className="dash-table-row">
                   <div>
                     <span className="dash-table-primary">
@@ -131,6 +140,17 @@ export default function AuditorDashboard() {
               ))}
               {filtered.length === 0 && <p className="dash-card-desc" style={{ padding: 12 }}>No entries match this filter.</p>}
             </div>
+            <Pagination
+              currentPage={auditPage}
+              totalItems={filtered.length}
+              pageSize={auditPageSize}
+              onPageChange={setAuditPage}
+              onPageSizeChange={(newSize) => {
+                setAuditPageSize(newSize)
+                setAuditPage(1)
+              }}
+              pageSizeOptions={[10, 15, 25, 50]}
+            />
           </div>
         </>
       )}

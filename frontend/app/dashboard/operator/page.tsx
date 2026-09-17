@@ -49,6 +49,7 @@ import { api, LAND_CLASSIFICATION_OPTIONS } from '@/lib/api'
 import type { DocumentItem, LandRecord, LandClassificationOption } from '@/lib/api-types'
 import { Skeleton, SkeletonTable } from '@/components/ui/skeleton'
 import { MouzaMapStudio } from '@/components/mouza-map-studio'
+import { Pagination } from '@/components/ui/pagination'
 
 interface ProcessingStage {
   id: number
@@ -102,6 +103,10 @@ export default function OperatorDashboard() {
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('')
   const [districtFilter, setDistrictFilter] = useState('All')
+  const [recordsPage, setRecordsPage] = useState(1)
+  const [recordsPageSize, setRecordsPageSize] = useState(10)
+  const [docsPage, setDocsPage] = useState(1)
+  const [docsPageSize, setDocsPageSize] = useState(10)
 
   const stages: ProcessingStage[] = [
     { id: 1, title: 'Document Ingestion', desc: 'Uploading PDF to Cloudinary Secure Storage CDN', status: currentStageIdx > 0 ? 'completed' : currentStageIdx === 0 ? 'active' : 'pending' },
@@ -383,6 +388,16 @@ export default function OperatorDashboard() {
     return matchesSearch && matchesDistrict
   })
 
+  const paginatedRecords = filteredRecords.slice(
+    (recordsPage - 1) * recordsPageSize,
+    recordsPage * recordsPageSize
+  )
+
+  const paginatedDocs = queue.slice(
+    (docsPage - 1) * docsPageSize,
+    docsPage * docsPageSize
+  )
+
   return (
     <DashboardShell role="operator" activeSection={section} onSectionChange={setSection}>
       {/* 1. SECTION: OVERVIEW */}
@@ -400,7 +415,7 @@ export default function OperatorDashboard() {
               <button className="dash-outline-btn border-amber-500/40 text-amber-600 dark:text-amber-400" onClick={() => setSection('Mouza Maps (GIS)')}>
                 <Layers size={14} /> Mouza GIS Studio
               </button>
-              <button className="dash-outline-btn" onClick={loadData}>
+              <button className="dash-outline-btn" onClick={() => loadData()}>
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
             </div>
@@ -442,7 +457,10 @@ export default function OperatorDashboard() {
                     type="text"
                     placeholder="Search Khasra, Owner, Village..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setRecordsPage(1)
+                    }}
                     className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent"
                   />
                 </div>
@@ -463,10 +481,10 @@ export default function OperatorDashboard() {
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
                   {loading ? (
                     <SkeletonTable rows={5} cols={8} />
-                  ) : filteredRecords.map((rec) => (
+                  ) : paginatedRecords.map((rec) => (
                     <tr
                       key={rec.id}
                       onClick={() => openRecordInspector(rec)}
@@ -543,6 +561,14 @@ export default function OperatorDashboard() {
                   )}
                 </tbody>
               </table>
+              <Pagination
+                currentPage={recordsPage}
+                totalItems={filteredRecords.length}
+                pageSize={recordsPageSize}
+                onPageChange={setRecordsPage}
+                onPageSizeChange={setRecordsPageSize}
+                pageSizeOptions={[10, 25, 50]}
+              />
             </div>
           </div>
         </>
@@ -644,15 +670,15 @@ export default function OperatorDashboard() {
 
                 <div className="space-y-2 text-xs">
                   <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-gray-200 dark:border-gray-800">
-                    <div className="font-semibold text-gray-800 dark:text-gray-200">🥇 Primary VLM Model</div>
+                    <div className="font-semibold text-gray-800 dark:text-gray-200">Primary Vision Engine</div>
                     <div className="text-[11px] text-gray-500 font-mono">qwen/qwen3.8-27b (Native Vision)</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-gray-200 dark:border-gray-800">
-                    <div className="font-semibold text-gray-800 dark:text-gray-200">🥈 Secondary VLM Model</div>
+                    <div className="font-semibold text-gray-800 dark:text-gray-200">Secondary Vision Engine</div>
                     <div className="text-[11px] text-gray-500 font-mono">qwen/qwen3.6-27b (Fast Vision)</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-gray-200 dark:border-gray-800">
-                    <div className="font-semibold text-gray-800 dark:text-gray-200">🥉 Text Reasoning Fallback</div>
+                    <div className="font-semibold text-gray-800 dark:text-gray-200">Text Reasoning Fallback</div>
                     <div className="text-[11px] text-gray-500 font-mono">openai/gpt-oss-120b</div>
                   </div>
                 </div>
@@ -680,7 +706,7 @@ export default function OperatorDashboard() {
               <h2 className="dash-card-title flex items-center gap-2"><Database size={16} /> Ingestion & Processing Queue ({queue.length})</h2>
               <p className="dash-card-desc">Track status and reprocessing history of all submitted document files</p>
             </div>
-            <button className="dash-outline-btn" onClick={loadData}><RefreshCw size={14} /> Refresh</button>
+            <button className="dash-outline-btn" onClick={() => loadData()}><RefreshCw size={14} /> Refresh</button>
           </div>
           <div className="dash-table">
             {loading ? (
@@ -699,7 +725,7 @@ export default function OperatorDashboard() {
                 ))}
               </div>
             ) : (
-              queue.map((doc) => (
+              paginatedDocs.map((doc) => (
                 <div key={doc.id} className="dash-table-row">
                   <div className="flex items-center gap-3">
                     <FileText size={16} style={{ color: 'var(--ochre)' }} />
@@ -736,6 +762,14 @@ export default function OperatorDashboard() {
               ))
             )}
             {!loading && queue.length === 0 && <p className="dash-card-desc p-4">No documents in queue. Go to Upload Documents to ingest deeds.</p>}
+            <Pagination
+              currentPage={docsPage}
+              totalItems={queue.length}
+              pageSize={docsPageSize}
+              onPageChange={setDocsPage}
+              onPageSizeChange={setDocsPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}
@@ -751,7 +785,7 @@ export default function OperatorDashboard() {
 
       {/* 5. SECTION: MOUZA MAPS (GIS) */}
       {section === 'Mouza Maps (GIS)' && (
-        <MouzaMapStudio />
+        <MouzaMapStudio readOnly={false} role="operator" />
       )}
 
       {/* OCR LIVE PROCESSING MODAL */}

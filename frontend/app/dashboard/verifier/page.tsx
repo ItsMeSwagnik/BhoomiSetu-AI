@@ -19,12 +19,21 @@ import {
   ExternalLink,
   ChevronRight,
   Filter,
-  CheckSquare
+  CheckSquare,
+  Search,
+  SlidersHorizontal,
+  History,
+  ArrowRight,
+  HelpCircle,
+  Clock,
+  RotateCcw
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LandRecord, FieldCorrection, ValidationScorecard, FieldVerification } from '@/lib/api-types'
 import PdfViewer from '@/components/pdf-viewer'
 import { Skeleton, SkeletonTable } from '@/components/ui/skeleton'
+import { MouzaMapStudio } from '@/components/mouza-map-studio'
+import { Pagination } from '@/components/ui/pagination'
 
 const REVENUE_FIELD_LABELS: Record<string, string> = {
   owner: 'Primary Owner / Transferee',
@@ -63,6 +72,14 @@ export default function VerifierDashboard() {
   const [filterValidation, setFilterValidation] = useState<'all' | 'true' | 'false'>('all')
   const [activeTab, setActiveTab] = useState<'split' | 'matrix' | 'pdf'>('split')
   const [parcels, setParcels] = useState<{ id: string; plotNumber: string; village: string; calculatedArea: number }[]>([])
+  const [ocrSearchQuery, setOcrSearchQuery] = useState('')
+  const [ocrFilter, setOcrFilter] = useState<'all' | 'flagged' | 'low_confidence' | 'resolved'>('all')
+  const [inlineEdits, setInlineEdits] = useState<Record<string, string>>({})
+  const [inlineSaving, setInlineSaving] = useState<string | null>(null)
+  const [overviewPage, setOverviewPage] = useState(1)
+  const [overviewPageSize, setOverviewPageSize] = useState(10)
+  const [ocrPage, setOcrPage] = useState(1)
+  const [ocrPageSize, setOcrPageSize] = useState(15)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -143,6 +160,11 @@ export default function VerifierDashboard() {
     return true
   })
 
+  const paginatedQueue = filteredQueue.slice(
+    (overviewPage - 1) * overviewPageSize,
+    overviewPage * overviewPageSize
+  )
+
   // Prepare key field pairs for selected record
   const getFieldPairs = (rec: LandRecord) => {
     const fields: Array<{
@@ -201,6 +223,89 @@ export default function VerifierDashboard() {
 
     return fields
   }
+
+  const handleSaveInline = async (recordId: string, fieldKey: string, newValue: string) => {
+    const editKey = `${recordId}_${fieldKey}`
+    setInlineSaving(editKey)
+    try {
+      await api.records.patch(recordId, { [fieldKey]: newValue })
+      setQueue((prev) =>
+        prev.map((r) => (r.id === recordId ? { ...r, [fieldKey]: newValue } : r))
+      )
+      setInlineEdits((prev) => {
+        const next = { ...prev }
+        delete next[editKey]
+        return next
+      })
+    } catch (err: any) {
+      alert(`Error saving correction: ${err?.message || 'Server error'}`)
+    } finally {
+      setInlineSaving(null)
+    }
+  }
+
+  // Flatten all fields across the queue for the OCR Corrections auditor
+  const allOcrFields = queue.flatMap((rec) => {
+    const pairs = getFieldPairs(rec)
+    return pairs.map((pair) => {
+      const fieldConfidence = pair.verification
+        ? pair.verification.matchScore * 100
+        : (rec.confidenceScore || 0.85) * 100
+      const isDiscrepancy =
+        pair.verification?.matchStatus === 'DISCREPANCY' ||
+        (pair.verification && pair.verification.matchScore < 0.75) ||
+        fieldConfidence < 75
+      const isResolved = rec.status === 'verified' || rec.isValidated === true
+
+      return {
+        recordId: rec.id,
+        record: rec,
+        fieldKey: pair.key,
+        label: pair.label,
+        currentValue: pair.value,
+        verification: pair.verification,
+        confidence: Math.round(fieldConfidence),
+        isDiscrepancy,
+        isResolved,
+      }
+    })
+  })
+
+  const filteredOcrFields = allOcrFields.filter((item) => {
+    if (ocrSearchQuery.trim()) {
+      const q = ocrSearchQuery.toLowerCase()
+      const matchesSearch =
+        item.label.toLowerCase().includes(q) ||
+        item.currentValue.toLowerCase().includes(q) ||
+        (item.record.owner && item.record.owner.toLowerCase().includes(q)) ||
+        (item.record.plotNumber && item.record.plotNumber.toLowerCase().includes(q)) ||
+        (item.record.khasra && item.record.khasra.toLowerCase().includes(q)) ||
+        (item.record.mouza && item.record.mouza.toLowerCase().includes(q)) ||
+        (item.verification?.pdfContextSnippet && item.verification.pdfContextSnippet.toLowerCase().includes(q))
+      if (!matchesSearch) return false
+    }
+
+    if (ocrFilter === 'flagged') {
+      return item.isDiscrepancy
+    }
+    if (ocrFilter === 'low_confidence') {
+      return item.confidence < 80
+    }
+    if (ocrFilter === 'resolved') {
+      return item.isResolved
+    }
+    return true
+  })
+
+  const paginatedOcrFields = filteredOcrFields.slice(
+    (ocrPage - 1) * ocrPageSize,
+    ocrPage * ocrPageSize
+  )
+
+  const ocrFlaggedCount = allOcrFields.filter((f) => f.isDiscrepancy).length
+  const ocrLowConfCount = allOcrFields.filter((f) => f.confidence < 80).length
+  const ocrHighConfCount = allOcrFields.filter((f) => f.confidence >= 90).length
+  const ocrResolvedCount = allOcrFields.filter((f) => f.isResolved).length
 
   return (
     <DashboardShell role="verifier" activeSection={section} onSectionChange={setSection}>
@@ -269,7 +374,10 @@ export default function VerifierDashboard() {
               {/* Filter Tabs */}
               <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg text-xs">
                 <button
-                  onClick={() => setFilterValidation('all')}
+                  onClick={() => {
+                    setFilterValidation('all')
+                    setOverviewPage(1)
+                  }}
                   className={`px-3 py-1 rounded-md transition font-medium ${
                     filterValidation === 'all'
                       ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
@@ -279,7 +387,10 @@ export default function VerifierDashboard() {
                   All ({queue.length})
                 </button>
                 <button
-                  onClick={() => setFilterValidation('true')}
+                  onClick={() => {
+                    setFilterValidation('true')
+                    setOverviewPage(1)
+                  }}
                   className={`px-3 py-1 rounded-md transition font-medium flex items-center gap-1 ${
                     filterValidation === 'true'
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -289,7 +400,10 @@ export default function VerifierDashboard() {
                   <ShieldCheck size={13} /> Validated (True) ({validatedTrueCount})
                 </button>
                 <button
-                  onClick={() => setFilterValidation('false')}
+                  onClick={() => {
+                    setFilterValidation('false')
+                    setOverviewPage(1)
+                  }}
                   className={`px-3 py-1 rounded-md transition font-medium flex items-center gap-1 ${
                     filterValidation === 'false'
                       ? 'bg-amber-600 text-white shadow-sm'
@@ -301,6 +415,14 @@ export default function VerifierDashboard() {
               </div>
             </div>
 
+            {loading ? (
+              <SkeletonTable rows={5} cols={8} />
+            ) : filteredQueue.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                <FileText size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No records match the selected filter.</p>
+              </div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -316,17 +438,7 @@ export default function VerifierDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {loading ? (
-                      <SkeletonTable rows={5} cols={8} />
-                    ) : filteredQueue.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-10 text-gray-500">
-                          <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                          <p className="text-sm">No records match the selected filter.</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredQueue.map((r) => {
+                    {paginatedQueue.map((r) => {
                       const scorecard = r.validationScorecard
                       const hasDiscrepancies = scorecard?.discrepancies && scorecard.discrepancies.length > 0
                       const fidelity = scorecard?.overallFidelityScore
@@ -410,11 +522,19 @@ export default function VerifierDashboard() {
                           </td>
                         </tr>
                       )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    })}
+                  </tbody>
+                </table>
+                <Pagination
+                  currentPage={overviewPage}
+                  totalItems={filteredQueue.length}
+                  pageSize={overviewPageSize}
+                  onPageChange={setOverviewPage}
+                  onPageSizeChange={setOverviewPageSize}
+                  pageSizeOptions={[10, 25, 50]}
+                />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -437,7 +557,7 @@ export default function VerifierDashboard() {
                   title="Re-run Ground Truth validation against source PDF"
                 >
                   <RefreshCw size={13} className={validating ? 'animate-spin' : ''} />
-                  {validating ? 'Validating PDF…' : '⚡ Run PDF Validation'}
+                  {validating ? 'Validating PDF…' : 'Run PDF Validation'}
                 </button>
                 <button
                   onClick={submitVerification}
@@ -727,38 +847,355 @@ export default function VerifierDashboard() {
         </>
       )}
 
-      {section === 'GIS Validation' && (
+      {section === 'OCR Corrections' && (
         <>
           <div className="dash-page-header">
             <div>
-              <h1 className="dash-page-title">GIS Parcel Area Corroboration</h1>
-              <p className="dash-page-sub">PostGIS cadastral polygon area comparison against deed dimensions</p>
+              <h1 className="dash-page-title flex items-center gap-2">
+                <SlidersHorizontal size={22} className="text-emerald-600" />
+                OCR Discrepancy & Correction Audit Console
+              </h1>
+              <p className="dash-page-sub">
+                Audit field-level OCR confidence grades, resolve ground-truth discrepancies, and perform manual verifier overrides
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-medium flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                onClick={() => load()}
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh Extracted Fields
+              </button>
+              <button
+                className="dash-primary-btn text-xs"
+                onClick={() => setSection('Review Queue')}
+              >
+                <Eye size={13} /> Open Dual-Pane Studio
+              </button>
             </div>
           </div>
-          <div className="dash-card">
-            <h2 className="dash-card-title flex items-center gap-2">
-              <Layers size={15} /> Parcel Spatial Corroboration
-            </h2>
-            <div className="dash-table">
-              {parcels.map((p) => (
-                <div key={p.id} className="dash-table-row">
-                  <div>
-                    <span className="dash-table-primary">
-                      Plot {p.plotNumber} — {p.village}
-                    </span>
-                    <span className="dash-table-sub">GIS Polygon Area: {p.calculatedArea} ac</span>
-                  </div>
-                  <span className="dash-badge verified">Valid GIS Polygon</span>
-                </div>
-              ))}
-              {parcels.length === 0 && (
-                <p className="dash-card-desc" style={{ padding: 12 }}>
-                  No parcel spatial records found.
-                </p>
-              )}
+
+          {/* Stats Summary */}
+          <div className="dash-stats-row">
+            <div className="dash-stat-card">
+              <FileCheck2 size={18} className="dash-stat-icon forest" />
+              <p className="dash-stat-value">{allOcrFields.length}</p>
+              <span className="dash-stat-label">Total Fields Audited</span>
             </div>
+            <div className="dash-stat-card">
+              <AlertTriangle size={18} className="dash-stat-icon red" />
+              <p className="dash-stat-value text-amber-500">{ocrFlaggedCount}</p>
+              <span className="dash-stat-label">Flagged Discrepancies</span>
+            </div>
+            <div className="dash-stat-card">
+              <SlidersHorizontal size={18} className="dash-stat-icon ochre" />
+              <p className="dash-stat-value text-blue-500">{ocrLowConfCount}</p>
+              <span className="dash-stat-label">Low Confidence (&lt;80%)</span>
+            </div>
+            <div className="dash-stat-card">
+              <ShieldCheck size={18} className="dash-stat-icon forest" />
+              <p className="dash-stat-value text-emerald-600">{ocrHighConfCount}</p>
+              <span className="dash-stat-label">High Confidence Match (90%+)</span>
+            </div>
+          </div>
+
+          {/* Filter & Search Bar */}
+          <div className="dash-card">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2 flex-1 min-w-[280px] max-w-md">
+                <div className="relative w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={ocrSearchQuery}
+                    onChange={(e) => {
+                      setOcrSearchQuery(e.target.value)
+                      setOcrPage(1)
+                    }}
+                    placeholder="Search by plot, owner, field name, or extracted text..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  {ocrSearchQuery && (
+                    <button
+                      onClick={() => {
+                        setOcrSearchQuery('')
+                        setOcrPage(1)
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg text-xs">
+                <button
+                  onClick={() => {
+                    setOcrFilter('all')
+                    setOcrPage(1)
+                  }}
+                  className={`px-3 py-1 rounded-md transition font-medium ${
+                    ocrFilter === 'all'
+                      ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
+                      : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  All Fields ({allOcrFields.length})
+                </button>
+                <button
+                  onClick={() => {
+                    setOcrFilter('flagged')
+                    setOcrPage(1)
+                  }}
+                  className={`px-3 py-1 rounded-md transition font-medium flex items-center gap-1 ${
+                    ocrFilter === 'flagged'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                  }`}
+                >
+                  <AlertTriangle size={12} /> Flagged Discrepancies ({ocrFlaggedCount})
+                </button>
+                <button
+                  onClick={() => {
+                    setOcrFilter('low_confidence')
+                    setOcrPage(1)
+                  }}
+                  className={`px-3 py-1 rounded-md transition font-medium flex items-center gap-1 ${
+                    ocrFilter === 'low_confidence'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                  }`}
+                >
+                  <SlidersHorizontal size={12} /> Low Confidence ({ocrLowConfCount})
+                </button>
+                <button
+                  onClick={() => {
+                    setOcrFilter('resolved')
+                    setOcrPage(1)
+                  }}
+                  className={`px-3 py-1 rounded-md transition font-medium flex items-center gap-1 ${
+                    ocrFilter === 'resolved'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                  }`}
+                >
+                  <ShieldCheck size={12} /> Verified / Overridden ({ocrResolvedCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Field Table */}
+            {filteredOcrFields.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <SlidersHorizontal size={36} className="mx-auto mb-2 opacity-30 text-emerald-500" />
+                <p className="text-sm font-medium">No OCR extraction fields match the active filter criteria.</p>
+                {ocrSearchQuery && (
+                  <button
+                    className="text-xs text-emerald-600 dark:text-emerald-400 underline mt-2"
+                    onClick={() => {
+                      setOcrSearchQuery('')
+                      setOcrFilter('all')
+                      setOcrPage(1)
+                    }}
+                  >
+                    Clear active search & filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="dash-table w-full text-left">
+                  <thead>
+                    <tr>
+                      <th>Document / Plot</th>
+                      <th>Extracted Field</th>
+                      <th>OCR Extracted Value & Confidence</th>
+                      <th>PDF Ground-Truth Context</th>
+                      <th>Verification Status</th>
+                      <th>Override / Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedOcrFields.map((item, idx) => {
+                      const editKey = `${item.recordId}_${item.fieldKey}`
+                      const isEditing = inlineEdits[editKey] !== undefined
+                      const currentEditVal = isEditing ? inlineEdits[editKey] : item.currentValue
+                      const isSaving = inlineSaving === editKey
+
+                      return (
+                        <tr key={`${item.recordId}_${item.fieldKey}_${idx}`} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/40 transition">
+                          <td className="w-48">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100 text-xs">
+                              Plot {item.record.plotNumber || item.record.khasra || item.record.dag || 'N/A'}
+                            </div>
+                            <div className="text-[11px] text-gray-500 truncate max-w-[180px]">
+                              Owner: {item.record.owner || 'Unknown'}
+                            </div>
+                            <div className="text-[10px] text-gray-400">
+                              Mouza: {item.record.mouza || item.record.village || 'N/A'}
+                            </div>
+                          </td>
+
+                          <td className="w-44">
+                            <span className="font-medium text-xs text-gray-800 dark:text-gray-200">
+                              {item.label}
+                            </span>
+                            <div className="text-[10px] font-mono text-gray-400">
+                              {item.fieldKey}
+                            </div>
+                          </td>
+
+                          <td className="w-64">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={currentEditVal}
+                                  onChange={(e) =>
+                                    setInlineEdits((prev) => ({ ...prev, [editKey]: e.target.value }))
+                                  }
+                                  className="w-full text-xs px-2 py-1 rounded border border-emerald-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveInline(item.recordId, item.fieldKey, currentEditVal)}
+                                  disabled={isSaving}
+                                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50"
+                                  title="Save correction"
+                                >
+                                  {isSaving ? <RefreshCw size={12} className="animate-spin" /> : <Check size={12} />}
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setInlineEdits((prev) => {
+                                      const next = { ...prev }
+                                      delete next[editKey]
+                                      return next
+                                    })
+                                  }
+                                  className="p-1 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition"
+                                  title="Cancel"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="font-mono text-xs font-semibold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/60 p-1 rounded border border-gray-200 dark:border-gray-800 break-words">
+                                  {item.currentValue || '—'}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full ${
+                                        item.confidence >= 90
+                                          ? 'bg-emerald-500'
+                                          : item.confidence >= 75
+                                          ? 'bg-amber-500'
+                                          : 'bg-red-500'
+                                      }`}
+                                      style={{ width: `${item.confidence}%` }}
+                                    />
+                                  </div>
+                                  <span
+                                    className={`text-[10px] font-mono font-bold ${
+                                      item.confidence >= 90
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : item.confidence >= 75
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-red-500 dark:text-red-400'
+                                    }`}
+                                  >
+                                    {item.confidence}% Confidence
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="max-w-xs">
+                            {item.verification?.pdfContextSnippet ? (
+                              <div className="text-[11px] text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-1.5 rounded border-l-2 border-emerald-500 font-mono">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                                  p.{item.verification.pageNumber || 1}:
+                                </span>{' '}
+                                &quot;{item.verification.pdfContextSnippet}&quot;
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-gray-400 italic">
+                                Original PDF text verified during Groq extraction
+                              </span>
+                            )}
+                          </td>
+
+                          <td>
+                            {item.verification?.matchStatus === 'DISCREPANCY' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300">
+                                <AlertTriangle size={11} /> Discrepancy
+                              </span>
+                            ) : item.verification?.matchStatus === 'PROBABLE_MATCH' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                                <CheckCircle2 size={11} /> Probable Match
+                              </span>
+                            ) : item.confidence >= 90 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                <ShieldCheck size={11} /> Verified Match
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                <AlertTriangle size={11} /> Needs Verification
+                              </span>
+                            )}
+                          </td>
+
+                          <td>
+                            <div className="flex items-center gap-1.5">
+                              {!isEditing && (
+                                <button
+                                  onClick={() =>
+                                    setInlineEdits((prev) => ({
+                                      ...prev,
+                                      [editKey]: item.currentValue,
+                                    }))
+                                  }
+                                  className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium flex items-center gap-1 transition"
+                                  title="Quick inline edit"
+                                >
+                                  <Edit3 size={11} /> Edit
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openRecord(item.recordId)}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
+                                title="Open in Dual-Pane PDF Studio"
+                              >
+                                <Eye size={11} /> Studio
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <Pagination
+                  currentPage={ocrPage}
+                  totalItems={filteredOcrFields.length}
+                  pageSize={ocrPageSize}
+                  onPageChange={setOcrPage}
+                  onPageSizeChange={setOcrPageSize}
+                  pageSizeOptions={[15, 30, 60]}
+                />
+              </div>
+            )}
           </div>
         </>
+      )}
+
+      {section === 'GIS Validation' && (
+        <MouzaMapStudio readOnly={true} role="verifier" />
       )}
     </DashboardShell>
   )

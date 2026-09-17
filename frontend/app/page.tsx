@@ -18,11 +18,12 @@ import VerificationStudio from '@/components/verification-studio'
 import CadastralGis from '@/components/cadastral-gis'
 import ValidationEngine from '@/components/validation-engine'
 import DashboardView from '@/components/dashboard-view'
+import StudyScopeMatrix from '@/components/study-scope-matrix'
 import { useScrollReveal } from '@/lib/use-scroll-reveal'
 import { useTheme } from '@/lib/use-theme'
 import BrandIcon from '@/components/brand-icon'
 
-const navItems = ['Home', 'About', 'Solutions', 'Pipeline', 'Records', 'Cadastre', 'Validation', 'Telemetry', 'Contact']
+const navItems = ['Home', 'About', 'Solutions', 'Specs', 'Pipeline', 'Records', 'Cadastre', 'Validation', 'Telemetry', 'Contact']
 const solutions = [
   ['Digitize', 'Turn fragile paper archives into structured, searchable land records.'],
   ['Validate', 'Compare extracted details with cadastral geometry and review every mismatch.'],
@@ -118,7 +119,7 @@ export default function Page() {
           </p>
           <div className="hero-buttons">
             <Link href="/auth" className="terra-pill light">
-              Begin verification <ArrowRight size={15} />
+              Get started <ArrowRight size={15} />
             </Link>
             <a className="hero-link" href="#pipeline" onClick={(e) => { e.preventDefault(); handleNavClick('Pipeline') }}>
               Explore the system <ChevronDown size={15} />
@@ -185,6 +186,7 @@ export default function Page() {
       <VerificationStudio />
       <CadastralGis />
       <ValidationEngine />
+      <StudyScopeMatrix />
       <DashboardView />
 
       <RevealSection className="terra-section contact-section" id="contact">
